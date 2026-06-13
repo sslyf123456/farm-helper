@@ -1,0 +1,44 @@
+:root {
+  --fh-green: #2d6a4f;
+  --fh-green-light: #40916c;
+  --fh-bg: #eef2ef;
+  --fh-card: #f8faf9;
+  --fh-text: #1b4332;
+  --fh-muted: #6c757d;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#app {
+  margin: 0;
+  min-height: 100%;
+}
+
+body {
+  font-family: 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  background: var(--fh-bg);
+  color: var(--fh-text);
+}
+
+.page-title {
+  margin: 0 0 6px;
+  font-size: 22px;
+  font-weight: 700;
+}
+
+.page-desc {
+  margin: 0 0 20px;
+  color: var(--fh-muted);
+  font-size: 14px;
+}
+
+.page-card {
+  background: var(--fh-card);
+  border-radius: 12px;
+  padding: 24px;
+  box-shadow: 0 2px 12px rgba(27, 67, 50, 0.08);
+}

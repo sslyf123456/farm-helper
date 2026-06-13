@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32">
+  <!-- 稻穗 favicon — 简洁、小尺寸下可辨识 -->
+  <defs>
+    <linearGradient id="grain" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#F6C445"/>
+      <stop offset="100%" stop-color="#E8A317"/>
+    </linearGradient>
+  </defs>
+  <!-- 茎 -->
+  <path d="M16 28 L16 12" stroke="#5B8C3E" stroke-width="2.2" stroke-linecap="round"/>
+  <!-- 叶 -->
+  <path d="M16 22 Q10 19 9 16" stroke="#5B8C3E" stroke-width="1.8" fill="none" stroke-linecap="round"/>
+  <path d="M16 19 Q22 16 23 13" stroke="#5B8C3E" stroke-width="1.8" fill="none" stroke-linecap="round"/>
+  <!-- 麦粒 - 左 -->
+  <ellipse cx="13" cy="11" rx="2" ry="3.2" transform="rotate(-25 13 11)" fill="url(#grain)"/>
+  <ellipse cx="11" cy="14" rx="2" ry="3.2" transform="rotate(-35 11 14)" fill="url(#grain)"/>
+  <!-- 麦粒 - 右 -->
+  <ellipse cx="19" cy="11" rx="2" ry="3.2" transform="rotate(25 19 11)" fill="url(#grain)"/>
+  <ellipse cx="21" cy="14" rx="2" ry="3.2" transform="rotate(35 21 14)" fill="url(#grain)"/>
+  <!-- 麦粒 - 顶 -->
+  <ellipse cx="16" cy="8" rx="2" ry="3.5" fill="url(#grain)"/>
+</svg>

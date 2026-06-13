@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" fill="none">
+  <!-- 装饰圆点 -->
+  <circle cx="40" cy="40" r="6" fill="#a5d6a7" opacity="0.5"/>
+  <circle cx="160" cy="50" r="4" fill="#81c784" opacity="0.4"/>
+  <circle cx="30" cy="160" r="5" fill="#a5d6a7" opacity="0.4"/>
+  <circle cx="170" cy="155" r="7" fill="#81c784" opacity="0.3"/>
+  <!-- 主茎 -->
+  <path d="M100 165 L100 80" stroke="#66bb6a" stroke-width="4" stroke-linecap="round"/>
+  <!-- 叶子 - 左上 -->
+  <path d="M100 120 Q80 100 60 110 Q75 118 100 120Z" fill="#81c784"/>
+  <!-- 叶子 - 右上 -->
+  <path d="M100 95 Q120 75 140 85 Q125 93 100 95Z" fill="#66bb6a"/>
+  <!-- 叶子 - 左小 -->
+  <path d="M100 140 Q85 130 75 138 Q87 142 100 140Z" fill="#a5d6a7"/>
+  <!-- 花苞/果实 -->
+  <ellipse cx="100" cy="72" rx="14" ry="16" fill="#43a047" opacity="0.8"/>
+  <ellipse cx="100" cy="72" rx="10" ry="12" fill="#66bb6a"/>
+  <!-- 光泽 -->
+  <ellipse cx="96" cy="68" rx="4" ry="5" fill="#a5d6a7" opacity="0.6"/>
+  <!-- 土壤 -->
+  <ellipse cx="100" cy="170" rx="30" ry="6" fill="#a5d6a7" opacity="0.4"/>
+</svg>

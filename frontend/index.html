@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>王者荣耀农场助手</title>
+    <script>
+      // 消除 passive event listener 警告
+      (() => {
+        const supportsPassive = (() => {
+          let support = false
+          try {
+            const opts = Object.defineProperty({}, 'passive', {
+              get() { support = true }
+            })
+            window.addEventListener('test', null, opts)
+            window.removeEventListener('test', null, opts)
+          } catch (e) {}
+          return support
+        })()
+
+        if (supportsPassive) {
+          const addEvent = EventTarget.prototype.addEventListener
+          EventTarget.prototype.addEventListener = function (type, listener, options) {
+            const usesListenerOptions = typeof options === 'object' && options !== null
+            const useCapture = usesListenerOptions ? options.capture : options
+            
+            options = usesListenerOptions ? options : {}
+            options.passive = options.passive !== undefined ? options.passive : 
+              ['touchstart', 'touchmove', 'wheel', 'mousewheel'].includes(type)
+            options.capture = useCapture !== undefined ? useCapture : false
+            
+            addEvent.call(this, type, listener, options)
+          }
+        }
+      })()
+    </script>
+  </head>
+  <body>
+    <div id="app"></div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
