@@ -62,13 +62,13 @@ GET /api/static/farm-levels
 ```json
 [
   {
-    "level": "2",
+    "level": 2,
     "upgrade_cost": "12",
     "required_exp": "5",
     "unlock_content": "解锁胡萝卜，可开垦农田数量3-4，解锁桃霞变异"
   },
   {
-    "level": "3",
+    "level": 3,
     "upgrade_cost": "50",
     "required_exp": "36",
     "unlock_content": "解锁番茄，解锁幽蓝变异"
@@ -76,13 +76,15 @@ GET /api/static/farm-levels
 ]
 ```
 
+> 注：`upgrade_cost`、`required_exp` 在较高级别时含中文单位（如 `"1.3万"`、`"1.03亿"`），因此保持字符串类型。
+
 **响应字段说明**
 
 | 字段 | 类型 | 说明 |
 |------|------|------|
-| level | string | 农场等级（目标等级，从 2 开始） |
-| upgrade_cost | string | 升级所需金币数量 |
-| required_exp | string | 升级所需当前经验值 |
+| level | number | 农场等级（目标等级，从 2 开始） |
+| upgrade_cost | string | 升级所需金币数量（可能含中文单位） |
+| required_exp | string | 升级所需当前经验值（可能含中文单位） |
 | unlock_content | string | 升至该等级后解锁的内容描述 |
 
 ---
@@ -104,30 +106,32 @@ GET /api/static/stall
 ```json
 [
   {
-    "level": "2",
+    "level": 2,
     "upgrade_cost": "1000",
     "gain_exp": "150",
-    "required_farm_level": "5",
+    "required_farm_level": 5,
     "price_boost": "5%"
   },
   {
-    "level": "3",
+    "level": 3,
     "upgrade_cost": "3000",
     "gain_exp": "360",
-    "required_farm_level": "7",
+    "required_farm_level": 7,
     "price_boost": "10%"
   }
 ]
 ```
 
+> 注：`upgrade_cost`、`gain_exp` 在较高级别时含中文单位（如 `"1万"`、`"1.01亿"`），因此保持字符串类型。
+
 **响应字段说明**
 
 | 字段 | 类型 | 说明 |
 |------|------|------|
-| level | string | 小摊升级后的目标等级 |
-| upgrade_cost | string | 升级所需金币 |
-| gain_exp | string | 升级后获得的农场经验 |
-| required_farm_level | string | 执行升级所需的农场等级下限 |
+| level | number | 小摊升级后的目标等级 |
+| upgrade_cost | string | 升级所需金币（可能含中文单位） |
+| gain_exp | string | 升级后获得的农场经验（可能含中文单位） |
+| required_farm_level | number | 执行升级所需的农场等级下限 |
 | price_boost | string | 升级后售价加成百分比（累计） |
 
 ---
@@ -152,25 +156,27 @@ GET /api/static/land
     "land_index": "第4块",
     "reclaim_cost": "10",
     "gain_exp": "20",
-    "required_level": "2"
+    "required_level": 2
   },
   {
     "land_index": "第5块",
     "reclaim_cost": "100",
     "gain_exp": "50",
-    "required_level": "4"
+    "required_level": 4
   }
 ]
 ```
+
+> 注：`reclaim_cost`、`gain_exp` 在较高级别时含中文单位（如 `"1.6万"`、`"1.07亿"`），因此保持字符串类型。
 
 **响应字段说明**
 
 | 字段 | 类型 | 说明 |
 |------|------|------|
 | land_index | string | 农田编号（如"第4块"） |
-| reclaim_cost | string | 开垦所需金币 |
-| gain_exp | string | 开垦后获得的农场经验 |
-| required_level | string | 开垦所需的农场等级下限 |
+| reclaim_cost | string | 开垦所需金币（可能含中文单位） |
+| gain_exp | string | 开垦后获得的农场经验（可能含中文单位） |
+| required_level | number | 开垦所需的农场等级下限 |
 
 ---
 
@@ -191,25 +197,25 @@ GET /api/static/crops
 ```json
 [
   {
-    "unlock_level": "1",
+    "unlock_level": 1,
     "name": "小麦",
-    "seed_price": "0",
-    "yield_qty": "3",
-    "total_sell_price": "3",
-    "exp_gain": "1",
-    "harvest_time": "30s",
-    "mutation_limit": "1",
+    "seed_price": 0,
+    "yield_qty": 3,
+    "total_sell_price": 3,
+    "exp_gain": 1,
+    "harvest_time": 30,
+    "mutation_limit": 1,
     "mutation_hero": ""
   },
   {
-    "unlock_level": "2",
+    "unlock_level": 2,
     "name": "胡萝卜",
-    "seed_price": "1",
-    "yield_qty": "5",
-    "total_sell_price": "10",
-    "exp_gain": "6",
-    "harvest_time": "2min",
-    "mutation_limit": "1",
+    "seed_price": 1,
+    "yield_qty": 5,
+    "total_sell_price": 10,
+    "exp_gain": 6,
+    "harvest_time": 120,
+    "mutation_limit": 1,
     "mutation_hero": ""
   }
 ]
@@ -219,14 +225,14 @@ GET /api/static/crops
 
 | 字段 | 类型 | 说明 |
 |------|------|------|
-| unlock_level | string | 解锁该作物所需的农场等级 |
+| unlock_level | number | 解锁该作物所需的农场等级 |
 | name | string | 作物名称（唯一标识，也用作 URL 路径参数） |
-| seed_price | string | 种子购买价格（金币），部分高级作物为空 |
-| yield_qty | string | 每次收获的产出数量 |
-| total_sell_price | string | 收获后出售的总金币收益 |
-| exp_gain | string | 收获后获得的农场经验，部分作物填 1（数据待补全） |
-| harvest_time | string | 从种下到成熟的时长（如 "30s"、"2min"、"1h"、"8h"、"16h"、"32h"） |
-| mutation_limit | string | 可同时变异的最大块数 |
+| seed_price | number | 种子购买价格（金币），部分高级作物可能为 null |
+| yield_qty | number | 每次收获的产出数量 |
+| total_sell_price | number | 收获后出售的总金币收益 |
+| exp_gain | number | 收获后获得的农场经验 |
+| harvest_time | number | 从种下到成熟的时长，以秒为单位的整数（如 30=30秒, 120=2分钟, 115200=32小时） |
+| mutation_limit | number | 可同时变异的最大块数 |
 | mutation_hero | string | 触发变异所需的英雄名，为空表示无需特定英雄 |
 
 ---
@@ -251,14 +257,14 @@ GET /api/static/crops/{name}
 
 ```json
 {
-  "unlock_level": "20",
+  "unlock_level": 20,
   "name": "蓝莓",
-  "seed_price": "675",
-  "yield_qty": "20",
-  "total_sell_price": "9000",
-  "exp_gain": "7142",
-  "harvest_time": "32h",
-  "mutation_limit": "3",
+  "seed_price": 675,
+  "yield_qty": 20,
+  "total_sell_price": 9000,
+  "exp_gain": 7142,
+  "harvest_time": 115200,
+  "mutation_limit": 3,
   "mutation_hero": "澜"
 }
 ```
@@ -298,16 +304,16 @@ GET /api/static/cultivation?crop={cropName}
 [
   {
     "crop": "小麦",
-    "total": "1",
-    "lv2": "1",
-    "lv3": "",
-    "lv4": "",
-    "lv5": "",
-    "lv6": "",
-    "lv7": "",
-    "lv8": "",
-    "lv9": "",
-    "lv10": ""
+    "total": 1,
+    "lv2": 1,
+    "lv3": null,
+    "lv4": null,
+    "lv5": null,
+    "lv6": null,
+    "lv7": null,
+    "lv8": null,
+    "lv9": null,
+    "lv10": null
   }
 ]
 ```
@@ -318,8 +324,8 @@ GET /api/static/cultivation?crop={cropName}
 [
   {
     "crop": "蓝莓",
-    "total": "...",
-    "lv2": "...",
+    "total": 12345,
+    "lv2": 2345,
     ...
   }
 ]
@@ -332,8 +338,8 @@ GET /api/static/cultivation?crop={cropName}
 | 字段 | 类型 | 说明 |
 |------|------|------|
 | crop | string | 作物名称 |
-| total | string | 满级（10级）所需培育积分总计 |
-| lv2 ~ lv10 | string | 各等级所需的培育积分，为空表示无需额外积分（即跳级或不解锁） |
+| total | number | 满级（10级）所需培育积分总计 |
+| lv2 ~ lv10 | number \| null | 各等级所需的培育积分，null 表示无需额外积分（即跳级或不解锁） |
 
 ---
 
@@ -356,14 +362,14 @@ GET /api/static/mutation-rates
   {
     "mutation_type": "绿光",
     "quality": "蓝色",
-    "multiplier": "1.5",
-    "unlock_level": "无"
+    "multiplier": 1.5,
+    "unlock_level": null
   },
   {
     "mutation_type": "桃霞",
     "quality": "蓝色",
-    "multiplier": "1.5",
-    "unlock_level": "2"
+    "multiplier": 1.5,
+    "unlock_level": 2
   }
 ]
 ```
@@ -374,8 +380,8 @@ GET /api/static/mutation-rates
 |------|------|------|
 | mutation_type | string | 变异特效名称 |
 | quality | string | 变异品质等级 |
-| multiplier | string | 售价倍率（相对普通作物） |
-| unlock_level | string | 解锁该变异所需的农场等级，"无"表示初始可用 |
+| multiplier | number | 售价倍率（相对普通作物） |
+| unlock_level | number \| null | 解锁该变异所需的农场等级，null 表示初始可用 |
 
 ---
 
@@ -398,23 +404,25 @@ GET /api/static/rewards
   {
     "level": "新手任务1",
     "gold_reward": "5.0万",
-    "exp_reward": "4800"
+    "exp_reward": 4800
   },
   {
     "level": "新手任务2",
     "gold_reward": "12.0万",
-    "exp_reward": "7200"
+    "exp_reward": 7200
   }
 ]
 ```
+
+> 注：`gold_reward` 含中文单位（如 `"5.0万"`），保持字符串类型。
 
 **响应字段说明**
 
 | 字段 | 类型 | 说明 |
 |------|------|------|
 | level | string | 任务名称或等级阶段 |
-| gold_reward | string | 完成后获得的金币数量 |
-| exp_reward | string | 完成后获得的农场经验 |
+| gold_reward | string | 完成后获得的金币数量（可能含中文单位） |
+| exp_reward | number | 完成后获得的农场经验 |
 
 ---
 
@@ -448,4 +456,4 @@ GET /api/static/rewards
 
 ---
 
-*文档最后更新：2026-06-10*
+*文档最后更新：2026-06-13*

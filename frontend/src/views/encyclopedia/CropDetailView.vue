@@ -46,12 +46,12 @@ const formatFieldValue = (field: { key: string }): string => {
   const value = crop.value[field.key]
   
   if (field.key === 'harvest_time') {
-    return formatHarvestTime(String(value || ''))
+    return formatHarvestTime(value)
   }
   
   if (field.key === 'total_sell_price_per_hour') {
-    const totalPrice = parseFloat(crop.value['total_sell_price'] || '0')
-    const hours = parseHarvestHours(String(crop.value['harvest_time'] || ''))
+    const totalPrice = Number(crop.value['total_sell_price'] ?? 0)
+    const hours = parseHarvestHours(crop.value['harvest_time'])
     if (hours > 0 && totalPrice > 0) {
       return (totalPrice / hours).toFixed(2)
     }
@@ -59,15 +59,15 @@ const formatFieldValue = (field: { key: string }): string => {
   }
   
   if (field.key === 'exp_gain_per_hour') {
-    const expGain = parseFloat(crop.value['exp_gain'] || '0')
-    const hours = parseHarvestHours(String(crop.value['harvest_time'] || ''))
+    const expGain = Number(crop.value['exp_gain'] ?? 0)
+    const hours = parseHarvestHours(crop.value['harvest_time'])
     if (hours > 0 && expGain > 0) {
       return (expGain / hours).toFixed(2)
     }
     return '--'
   }
   
-  if (!value) return '--'
+  if (value === null || value === undefined || value === '') return '--'
   return String(value)
 }
 
@@ -81,8 +81,7 @@ const cultivationLevels = computed(() => {
   return levels.map(lv => {
     const rawValue = cultivation.value![lv]
     
-    // 如果之前已经遇到空值，或当前值为空/0，标记后续都为空
-    if (foundEmpty || !rawValue || rawValue === '') {
+    if (foundEmpty || rawValue === null || rawValue === undefined || rawValue === '') {
       foundEmpty = true
       return {
         level: lv.replace('lv', ''),
@@ -91,7 +90,7 @@ const cultivationLevels = computed(() => {
       }
     }
     
-    const amount = parseInt(rawValue)
+    const amount = Number(rawValue)
     cumulative += amount
     
     return {

@@ -130,7 +130,11 @@ const filteredRows = computed(() => {
 
   return props.rows.filter((row) =>
 
-    keys.some((key) => (row[key] ?? '').toLowerCase().includes(kw)),
+    keys.some((key) => {
+      const val = row[key]
+      if (val === null || val === undefined) return false
+      return String(val).toLowerCase().includes(kw)
+    }),
 
   )
 
@@ -190,9 +194,9 @@ function compareCol(a: CsvRow, b: CsvRow, col: string): number {
 
   if (props.numericColumns.includes(col)) {
 
-    const va = parseChineseNumber(String(av))
+    const va = typeof av === 'number' ? av : parseChineseNumber(String(av))
 
-    const vb = parseChineseNumber(String(bv))
+    const vb = typeof bv === 'number' ? bv : parseChineseNumber(String(bv))
 
     return va - vb
 

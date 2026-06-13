@@ -1,41 +1,24 @@
-/** 将收获时间原始字符串格式化为中文：30s→30秒, 2min→2分钟, 1h→1小时 */
-export function formatHarvestTime(text: string): string {
-  const value = text.trim()
-  if (!value) return value
-
-  const secMatch = value.match(/^(\d+)s$/)
-  if (secMatch) return `${secMatch[1]}秒`
-
-  const minMatch = value.match(/^(\d+)min$/)
-  if (minMatch) return `${minMatch[1]}分钟`
-
-  const hourMatch = value.match(/^(\d+)h$/)
-  if (hourMatch) return `${hourMatch[1]}小时`
-
-  // 无法识别则原样返回
-  return value
+/**
+ * 将收获时间格式化为中文可读形式。
+ * 接受 number（新 API）或字符串（兼容），返回中文描述。
+ */
+export function formatHarvestTime(value: string | number | null | undefined): string {
+  const seconds = parseHarvestTime(value)
+  if (seconds === null) return '--'
+  return formatDuration(seconds)
 }
 
-/** 将收获时间字符串解析为秒数 */
-export function parseHarvestTime(text: string): number | null {
-  const value = text.trim()
-  if (!value) return null
-
-  const secMatch = value.match(/^(\d+)s$/)
-  if (secMatch) return Number(secMatch[1])
-
-  const minMatch = value.match(/^(\d+)min$/)
-  if (minMatch) return Number(minMatch[1]) * 60
-
-  const hourMatch = value.match(/^(\d+)h$/)
-  if (hourMatch) return Number(hourMatch[1]) * 3600
-
-  return null
+/** 将收获时间解析为秒数 */
+export function parseHarvestTime(value: string | number | null | undefined): number | null {
+  if (value === null || value === undefined) return null
+  if (typeof value === 'number') return Number.isFinite(value) && value >= 0 ? value : null
+  const n = Number(value)
+  return Number.isFinite(n) && n >= 0 ? n : null
 }
 
-/** 将收获时间字符串解析为小时数 */
-export function parseHarvestHours(text: string): number {
-  const seconds = parseHarvestTime(text)
+/** 将收获时间解析为小时数 */
+export function parseHarvestHours(value: string | number | null | undefined): number {
+  const seconds = parseHarvestTime(value)
   return seconds ? seconds / 3600 : 0
 }
 
@@ -54,7 +37,7 @@ export function formatDuration(seconds: number): string {
 
   const minutes = Math.floor(remain / 60)
   if (minutes > 0) {
-    parts.push(`${minutes} 分`)
+    parts.push(`${minutes} 分钟`)
     remain %= 60
   }
 

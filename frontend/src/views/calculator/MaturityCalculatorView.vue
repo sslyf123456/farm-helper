@@ -5,12 +5,13 @@ import {
   WATER_STRATEGIES,
   calcMaturitySeconds,
   formatDuration,
+  formatHarvestTime,
   parseHarvestTime,
 } from '@/utils/harvestTime'
 
 const crops = ref<CsvRow[]>([])
 const selectedCrop = ref('')
-const customTimeText = ref('')
+const customSeconds = ref<number | null>(null)
 const plantTime = ref<Date | null>(null)
 const usePlantTime = ref(false)
 
@@ -25,12 +26,9 @@ onMounted(async () => {
 const baseSeconds = computed(() => {
   if (selectedCrop.value) {
     const crop = crops.value.find((c) => c['name'] === selectedCrop.value)
-    if (crop) return parseHarvestTime(crop['harvest_time'] ?? '')
+    if (crop) return parseHarvestTime(crop['harvest_time'])
   }
-  if (customTimeText.value.trim()) {
-    return parseHarvestTime(customTimeText.value.trim())
-  }
-  return null
+  return customSeconds.value
 })
 
 const results = computed(() => {
@@ -48,8 +46,7 @@ const results = computed(() => {
 
 function onCropChange(name: string) {
   selectedCrop.value = name
-  const crop = crops.value.find((c) => c['name'] === name)
-  if (crop) customTimeText.value = crop['harvest_time'] ?? ''
+  customSeconds.value = null
 }
 </script>
 
@@ -70,18 +67,20 @@ function onCropChange(name: string) {
           >
             <el-option
               v-for="c in crops"
-              :key="c['name']"
-              :label="`${c['name']}（${c['harvest_time']}）`"
-              :value="c['name']"
+              :key="String(c['name'])"
+              :label="`${c['name']}（${formatHarvestTime(c['harvest_time'])}）`"
+              :value="String(c['name'])"
             />
           </el-select>
         </el-form-item>
-        <el-form-item label="或输入时间">
-          <el-input
-            v-model="customTimeText"
-            placeholder="如 30s、2min、1h、8h、16h、32h"
+        <el-form-item label="或输入秒数">
+          <el-input-number
+            v-model="customSeconds"
+            :min="1"
+            :step="60"
+            placeholder="输入秒数，如 1800"
             style="width: 280px"
-            @input="selectedCrop = ''"
+            @change="selectedCrop = ''"
           />
         </el-form-item>
         <el-form-item label="种下时间">

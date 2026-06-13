@@ -21,34 +21,34 @@ public class StaticDataController {
     }
 
     @GetMapping("/farm-levels")
-    public List<Map<String, String>> farmLevels() {
+    public List<Map<String, Object>> farmLevels() {
         return csvDataService.getFarmLevels();
     }
 
     @GetMapping("/stall")
-    public List<Map<String, String>> stall() {
+    public List<Map<String, Object>> stall() {
         return csvDataService.getStall();
     }
 
     @GetMapping("/land")
-    public List<Map<String, String>> land() {
+    public List<Map<String, Object>> land() {
         return csvDataService.getLand();
     }
 
     @GetMapping("/crops")
-    public List<Map<String, String>> crops() {
+    public List<Map<String, Object>> crops() {
         return csvDataService.getCrops();
     }
 
     @GetMapping("/crops/{name}")
-    public ResponseEntity<Map<String, String>> cropDetail(@PathVariable String name) {
+    public ResponseEntity<Map<String, Object>> cropDetail(@PathVariable String name) {
         return csvDataService.getCropByName(name)
                 .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());
     }
 
     @GetMapping("/cultivation")
-    public List<Map<String, String>> cultivation(@RequestParam(required = false) String crop) {
+    public List<Map<String, Object>> cultivation(@RequestParam(required = false) String crop) {
         if (crop != null && !crop.isBlank()) {
             return csvDataService.getCultivationByCrop(crop)
                     .map(List::of)
@@ -58,12 +58,12 @@ public class StaticDataController {
     }
 
     @GetMapping("/mutation-rates")
-    public List<Map<String, String>> mutationRates() {
+    public List<Map<String, Object>> mutationRates() {
         return csvDataService.getMutationRates();
     }
 
     @GetMapping("/rewards")
-    public List<Map<String, String>> rewards() {
+    public List<Map<String, Object>> rewards() {
         return csvDataService.getRewards();
     }
 }

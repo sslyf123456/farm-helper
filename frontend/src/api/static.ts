@@ -1,6 +1,7 @@
 import client from './client'
 
-export type CsvRow = Record<string, string>
+/** API 返回的行类型：数值字段为 number，文本字段为 string，空值可能为 null */
+export type CsvRow = Record<string, string | number | null>
 
 export const fetchFarmLevels = () =>
   client.get<CsvRow[]>('/static/farm-levels').then((r) => r.data)
@@ -24,3 +25,6 @@ export const fetchCultivation = (crop?: string) =>
 
 export const fetchMutationRates = () =>
   client.get<CsvRow[]>('/static/mutation-rates').then((r) => r.data)
+
+export const fetchRewards = () =>
+  client.get<CsvRow[]>('/static/rewards').then((r) => r.data)

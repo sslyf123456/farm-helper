@@ -23,17 +23,17 @@ onMounted(async () => {
 const filteredCrops = computed(() => {
   const kw = keyword.value.trim().toLowerCase()
   return crops.value.filter((c) => {
-    const name = (c['name'] ?? '').toLowerCase()
+    const name = String(c['name'] ?? '').toLowerCase()
     if (kw && !name.includes(kw)) return false
 
-    const time = c['harvest_time'] ?? ''
-    const hero = c['mutation_hero'] ?? ''
-    const exp = c['exp_gain'] ?? ''
+    const timeSeconds = Number(c['harvest_time'] ?? 0)
+    const hero = String(c['mutation_hero'] ?? '').trim()
+    const exp = Number(c['exp_gain'] ?? 0)
 
-    if (categoryFilter.value === 'hero') return time === '32h' || !!hero
-    if (categoryFilter.value === 'high_coin') return time === '16h' && exp === '1'
+    if (categoryFilter.value === 'hero') return timeSeconds === 115200 || !!hero
+    if (categoryFilter.value === 'high_coin') return timeSeconds === 57600 && exp === 1
     if (categoryFilter.value === 'exp') {
-      return !(time === '32h' || hero) && !(time === '16h' && exp === '1')
+      return !(timeSeconds === 115200 || hero) && !(timeSeconds === 57600 && exp === 1)
     }
     return true
   })
@@ -59,7 +59,7 @@ const filteredCrops = computed(() => {
     </div>
 
     <div v-loading="loading" class="crop-grid">
-      <CropCard v-for="crop in filteredCrops" :key="crop['name']" :crop="crop" />
+      <CropCard v-for="crop in filteredCrops" :key="String(crop['name'])" :crop="crop" />
     </div>
   </div>
 </template>

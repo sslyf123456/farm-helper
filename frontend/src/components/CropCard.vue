@@ -15,7 +15,7 @@ const props = defineProps<{
 
 const router = useRouter()
 
-const name = computed(() => props.crop['name'] ?? '')
+const name = computed(() => String(props.crop['name'] ?? ''))
 const category = computed(() => getCropCategory(props.crop))
 
 const { imageUrl: cropImage } = useCropImage(() => name.value)
@@ -24,16 +24,14 @@ const cropFrameHeight = `${CROP_CARD_FRAME_HEIGHT}px`
 const cropImageHeight = `${CROP_CARD_IMAGE_HEIGHT}px`
 
 const sellPerHour = computed(() => {
-  const ht = String(props.crop['harvest_time'] || '')
-  const hours = parseHarvestHours(ht)
-  const sell = parseFloat(String(props.crop['total_sell_price'] || '0')) || 0
+  const hours = parseHarvestHours(props.crop['harvest_time'])
+  const sell = Number(props.crop['total_sell_price'] ?? 0)
   return hours > 0 ? (sell / hours).toFixed(1) : '0'
 })
 
 const expPerHour = computed(() => {
-  const ht = String(props.crop['harvest_time'] || '')
-  const hours = parseHarvestHours(ht)
-  const exp = parseFloat(String(props.crop['exp_gain'] || '0')) || 0
+  const hours = parseHarvestHours(props.crop['harvest_time'])
+  const exp = Number(props.crop['exp_gain'] ?? 0)
   return hours > 0 ? (exp / hours).toFixed(1) : '0'
 })
 
@@ -59,7 +57,7 @@ function goDetail() {
       </div>
       <div class="crop-meta">
         <span class="meta-level">Lv.{{ crop['unlock_level'] }}</span>
-        <span class="meta-time">{{ formatHarvestTime(String(crop['harvest_time'] || '')) }}</span>
+        <span class="meta-time">{{ formatHarvestTime(crop['harvest_time']) }}</span>
       </div>
       <div class="crop-rates">
         <span class="rate-coin">{{ sellPerHour }}金币/h</span>

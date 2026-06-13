@@ -5,7 +5,7 @@ import DataTable from '@/components/DataTable.vue'
 import type { CsvRow } from '@/api/static'
 
 import { fetchFarmLevels, fetchStall, fetchLand, fetchCrops, fetchCultivation } from '@/api/static'
-import { parseHarvestTime, formatHarvestTime, parseHarvestHours } from '@/utils/harvestTime'
+import { formatHarvestTime, parseHarvestHours } from '@/utils/harvestTime'
 
 type TabKey = 'farm-levels' | 'stall' | 'land' | 'crops' | 'cultivation'
 
@@ -15,8 +15,8 @@ const tabMap: Record<TabKey, { label: string; fetcher: () => Promise<CsvRow[]>; 
     fetcher: fetchFarmLevels,
     props: {
       hideSearch: true,
-      numericColumns: ['level', 'upgrade_cost', 'required_exp'],
-      noSortColumns: ['unlock_content'],
+      numericColumns: ['level'],
+      noSortColumns: ['upgrade_cost', 'required_exp', 'unlock_content'],
       columnWidthPct: { level: 10, upgrade_cost: 15, required_exp: 15, unlock_content: 60 },
       columnLabels: { level: '等级', upgrade_cost: '升级费用', required_exp: '需要经验', unlock_content: '解锁内容' },
     },
@@ -26,7 +26,8 @@ const tabMap: Record<TabKey, { label: string; fetcher: () => Promise<CsvRow[]>; 
     fetcher: fetchStall,
     props: {
       hideSearch: true,
-      numericColumns: ['level', 'upgrade_cost', 'gain_exp', 'required_farm_level'],
+      numericColumns: ['level', 'required_farm_level'],
+      noSortColumns: ['upgrade_cost', 'gain_exp', 'required_farm_level', 'price_boost'],
       columnLabels: { level: '等级', upgrade_cost: '升级费用', gain_exp: '获得经验', required_farm_level: '需要等级', price_boost: '提升售价' },
     },
   },
@@ -35,8 +36,8 @@ const tabMap: Record<TabKey, { label: string; fetcher: () => Promise<CsvRow[]>; 
     fetcher: fetchLand,
     props: {
       hideSearch: true,
-      numericColumns: ['land_index', 'reclaim_cost', 'gain_exp'],
-      noSortColumns: ['land_index'],
+      numericColumns: [],
+      noSortColumns: ['land_index', 'reclaim_cost', 'gain_exp', 'required_level'],
       columnLabels: { land_index: '农田', reclaim_cost: '开垦费用', gain_exp: '获得经验', required_level: '需要等级' },
     },
   },
@@ -78,15 +79,14 @@ async function loadData(tab: TabKey) {
     const raw = await tabMap[tab].fetcher()
     if (tab === 'crops') {
       rows.value = raw.map(row => {
-        const ht = (row['harvest_time'] as string) || ''
-        const hours = parseHarvestHours(ht)
-        const sellPrice = parseFloat(String(row['total_sell_price'] || '0')) || 0
-        const expGain = parseFloat(String(row['exp_gain'] || '0')) || 0
+        const hours = parseHarvestHours(row['harvest_time'])
+        const sellPrice = Number(row['total_sell_price'] ?? 0)
+        const expGain = Number(row['exp_gain'] ?? 0)
         const sellPerHour = hours > 0 ? sellPrice / hours : 0
         const expPerHour = hours > 0 ? expGain / hours : 0
         return {
           ...row,
-          harvest_time: formatHarvestTime(ht),
+          harvest_time: formatHarvestTime(row['harvest_time']),
           sell_per_hour: sellPerHour.toFixed(2),
           exp_per_hour: expPerHour.toFixed(2),
         }
