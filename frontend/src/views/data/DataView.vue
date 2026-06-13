@@ -4,10 +4,10 @@ import { ElMessage } from 'element-plus'
 import DataTable from '@/components/DataTable.vue'
 import type { CsvRow } from '@/api/static'
 
-import { fetchFarmLevels, fetchStall, fetchLand, fetchCrops, fetchCultivation } from '@/api/static'
+import { fetchFarmLevels, fetchStall, fetchLand, fetchCrops, fetchCultivation, fetchRewards } from '@/api/static'
 import { formatHarvestTime, parseHarvestHours } from '@/utils/harvestTime'
 
-type TabKey = 'farm-levels' | 'stall' | 'land' | 'crops' | 'cultivation'
+type TabKey = 'farm-levels' | 'stall' | 'land' | 'crops' | 'cultivation' | 'rewards'
 
 const tabMap: Record<TabKey, { label: string; fetcher: () => Promise<CsvRow[]>; props: Record<string, any> }> = {
   'farm-levels': {
@@ -64,6 +64,16 @@ const tabMap: Record<TabKey, { label: string; fetcher: () => Promise<CsvRow[]>; 
       numericColumns: ['total', 'lv2', 'lv3', 'lv4', 'lv5', 'lv6', 'lv7', 'lv8', 'lv9', 'lv10'],
       noSortColumns: ['crop', 'lv2', 'lv3', 'lv4', 'lv5', 'lv6', 'lv7', 'lv8', 'lv9', 'lv10'],
       columnLabels: { crop: '作物', total: '合计', lv2: '2级', lv3: '3级', lv4: '4级', lv5: '5级', lv6: '6级', lv7: '7级', lv8: '8级', lv9: '9级', lv10: '10级' },
+    },
+  },
+  'rewards': {
+    label: '等级奖励表',
+    fetcher: fetchRewards,
+    props: {
+      hideSearch: true,
+      numericColumns: [],
+      noSortColumns: ['level', 'gold_reward', 'exp_reward'],
+      columnLabels: { level: '等级阶段', gold_reward: '金币奖励', exp_reward: '经验奖励' },
     },
   },
 }

@@ -404,17 +404,17 @@ GET /api/static/rewards
   {
     "level": "新手任务1",
     "gold_reward": "5.0万",
-    "exp_reward": 4800
+    "exp_reward": "4800"
   },
   {
     "level": "新手任务2",
     "gold_reward": "12.0万",
-    "exp_reward": 7200
+    "exp_reward": "7200"
   }
 ]
 ```
 
-> 注：`gold_reward` 含中文单位（如 `"5.0万"`），保持字符串类型。
+> 注：`gold_reward`、`exp_reward` 均含中文单位（如 `"5.0万"`、`"1.03亿"`），保持字符串类型。
 
 **响应字段说明**
 
@@ -422,7 +422,7 @@ GET /api/static/rewards
 |------|------|------|
 | level | string | 任务名称或等级阶段 |
 | gold_reward | string | 完成后获得的金币数量（可能含中文单位） |
-| exp_reward | number | 完成后获得的农场经验 |
+| exp_reward | string | 完成后获得的农场经验（可能含中文单位） |
 
 ---
 

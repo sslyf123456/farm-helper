@@ -61,8 +61,7 @@ public class CsvDataService {
     private static final Set<String> NUMERIC_MUTATION = Set.of(
             "multiplier", "unlock_level");
 
-    private static final Set<String> NUMERIC_REWARDS = Set.of(
-            "gold_reward", "exp_reward");
+    private static final Set<String> NUMERIC_REWARDS = Set.of();
 
     // ── 中文数字模式 ──
     private static final Pattern CN_NUM_PATTERN = Pattern.compile(
