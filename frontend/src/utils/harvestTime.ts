@@ -24,28 +24,28 @@ export function parseHarvestHours(value: string | number | null | undefined): nu
 
 /** 秒数格式化为可读中文 */
 export function formatDuration(seconds: number): string {
-  if (seconds < 60) return `${seconds} 秒`
+  if (seconds < 60) return `${seconds}秒`
 
   const parts: string[] = []
   let remain = Math.round(seconds)
 
   const hours = Math.floor(remain / 3600)
   if (hours > 0) {
-    parts.push(`${hours} 小时`)
+    parts.push(`${hours}小时`)
     remain %= 3600
   }
 
   const minutes = Math.floor(remain / 60)
   if (minutes > 0) {
-    parts.push(`${minutes} 分钟`)
+    parts.push(`${minutes}分钟`)
     remain %= 60
   }
 
   if (remain > 0 && hours === 0) {
-    parts.push(`${remain} 秒`)
+    parts.push(`${remain}秒`)
   }
 
-  return parts.join('') || '0 秒'
+  return parts.join('') || '0秒'
 }
 
 export type WaterStrategy = 'none' | 'once' | 'diligent' | 'extreme'
@@ -55,10 +55,10 @@ export const WATER_STRATEGIES: {
   label: string
   desc: string
 }[] = [
-  { key: 'none', label: '完全不浇水', desc: '自然成熟，耗时 T' },
-  { key: 'once', label: '种下时浇一次', desc: '减少 T/12，耗时 11T/12' },
-  { key: 'diligent', label: '勤奋浇水', desc: '种下 1 次 + 干涸后 2 次，耗时 3T/4' },
-  { key: 'extreme', label: '极限浇水', desc: '勤奋基础上再等 T/15 浇一次，耗时 11T/15' },
+  { key: 'none', label: '自然成熟', desc: '不浇水，耗时最长' },
+  { key: 'once', label: '佛系浇水', desc: '共浇水2次，缩短约16.7%的成熟时间' },
+  { key: 'diligent', label: '勤奋浇水', desc: '共浇水3次，缩短25%的成熟时间' },
+  { key: 'extreme', label: '极限浇水', desc: '共浇水4次，缩短约26.7%的成熟时间' },
 ]
 
 /** 根据策略计算实际成熟秒数 */
@@ -68,7 +68,7 @@ export function calcMaturitySeconds(baseSeconds: number, strategy: WaterStrategy
     case 'none':
       return T
     case 'once':
-      return (11 * T) / 12
+      return (5 * T) / 6
     case 'diligent':
       return (3 * T) / 4
     case 'extreme':

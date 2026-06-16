@@ -31,7 +31,7 @@ const router = createRouter({
       path: '/calculator/maturity',
       name: 'maturity-calculator',
       component: () => import('@/views/calculator/MaturityCalculatorView.vue'),
-      meta: { title: '成熟时间计算' },
+      meta: { title: '收菜计算器' },
     },
     {
       path: '/account',

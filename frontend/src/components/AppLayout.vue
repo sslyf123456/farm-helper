@@ -33,7 +33,7 @@ const activeMenu = computed(() => route.path)
         </el-menu-item>
         <el-menu-item index="/calculator/maturity">
           <el-icon><Timer /></el-icon>
-          成熟时间计算
+          收菜计算器
         </el-menu-item>
         <el-menu-item index="/account">
           <el-icon><User /></el-icon>
