@@ -42,3 +42,21 @@ body {
   padding: 24px;
   box-shadow: 0 2px 12px rgba(27, 67, 50, 0.08);
 }
+
+/* 缩小日期时间选择器弹出面板 */
+.compact-datetime-picker.el-picker__popper {
+  transform: scale(0.9);
+  transform-origin: top left;
+}
+
+.compact-datetime-picker .el-picker-panel__body {
+  font-size: 13px;
+}
+
+.compact-datetime-picker .el-date-picker__header {
+  padding: 8px;
+}
+
+.compact-datetime-picker .el-picker-panel__icon-btn {
+  font-size: 14px;
+}

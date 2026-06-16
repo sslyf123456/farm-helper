@@ -3,13 +3,12 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { InfoFilled, AlarmClock } from '@element-plus/icons-vue'
 import { Loading } from '@element-plus/icons-vue'
 import { fetchCrops, type CsvRow } from '@/api/static'
+import { calculateAllStrategies, type WateringResponse } from '@/api/calculator'
 import {
   WATER_STRATEGIES,
-  calcMaturitySeconds,
   formatDuration,
   formatHarvestTime,
   parseHarvestTime,
-  type WaterStrategy,
 } from '@/utils/harvestTime'
 
 /** 常见收获时间（秒）：1h, 8h, 16h, 32h */
@@ -23,6 +22,12 @@ const plantTime = ref<Date>(new Date())
 const timeMode = ref<'common' | 'all'>('common')
 /** 计算原理弹窗 */
 const showMechanism = ref(false)
+/** 是否正在计算 */
+const isCalculating = ref(false)
+/** 计算结果 */
+const calculationResults = ref<WateringResponse[]>([])
+/** 选中的策略（用于过滤显示） */
+const selectedStrategy = ref<string>('extreme')
 
 onMounted(async () => {
   plantTime.value = new Date()
@@ -104,196 +109,43 @@ watch(timeMode, (mode) => {
 /** 最终用于计算的基础秒数 */
 const baseSeconds = computed(() => selectedTimeSeconds.value)
 
+/** 当基础秒数或种植时间变化时，自动调用后端计算 */
+watch([baseSeconds, plantTime], async ([newBaseSeconds, newPlantTime]) => {
+  if (newBaseSeconds != null && newBaseSeconds > 0) {
+    isCalculating.value = true
+    try {
+      calculationResults.value = await calculateAllStrategies(newBaseSeconds, newPlantTime)
+    } catch (error) {
+      console.error('计算失败:', error)
+      calculationResults.value = []
+    } finally {
+      isCalculating.value = false
+    }
+  } else {
+    calculationResults.value = []
+  }
+}, { immediate: true })
+
 /** 选择时间卡片 */
 function selectTime(seconds: number) {
   if (selectedCrop.value) return
   selectedTimeSeconds.value = seconds
 }
 
-/** 根据策略类型，计算各浇水时刻（相对于种下时间的秒数） */
-function getWaterTimes(baseSeconds: number, key: WaterStrategy): number[] {
-  const T = baseSeconds
-  const W = T / 3          // 满水维持时间
-  const wait = T / 15       // 极限策略最后一次等待时间
-  switch (key) {
-    case 'none':
-      return []               // 不浇水
-    case 'once':
-      // 佛系：种下浇1次，再等 5T/6 后浇1次直接成熟
-      return [0, (5 * T) / 6]
-    case 'diligent':
-      // 种下 0、等W后、再等W后
-      return [0, W, 2 * W]
-    case 'extreme':
-      // 种下 0、等W后、再等W后、再等wait后
-      return [0, W, 2 * W, 2 * W + wait]
-    default:
-      return []
-  }
-}
-
-/** 节点类型 */
-interface TimeNode {
-  /** 步骤编号（从1开始） */
-  index: number
-  /** 标题文字 */
-  title: string
-  /** 描述：减时 + 剩余 + 湿润 */
-  desc: string
-  /** 该时刻距种下的秒数 */
-  offsetSeconds: number
-  /** 具体时间字符串（如 "今天 03:05"） */
-  timeStr: string | null
-  /** 是否为最终收菜节点 */
-  isHarvest: boolean
-}
-
-/** 格式化时间为 "YYYY-MM-DD HH:mm"（完整日期） */
-function formatTimeFull(base: Date, offsetSec: number): string {
-  const d = new Date(base.getTime() + offsetSec * 1000)
-  const yyyy = String(d.getFullYear())
-  const mo = String(d.getMonth() + 1).padStart(2, '0')
-  const dd = String(d.getDate()).padStart(2, '0')
-  const hh = String(d.getHours()).padStart(2, '0')
-  const mm = String(d.getMinutes()).padStart(2, '0')
-  return `${yyyy}-${mo}-${dd} ${hh}:${mm}`
-}
-
-/** 根据策略生成浇水/收菜节点列表 */
-function buildTimeNodes(
-  baseSec: number,
-  key: WaterStrategy,
-  matureSeconds: number,
-  plantDate: Date,
-): TimeNode[] {
-  const T = baseSec
-  const W = T / 3
-  const waterTimes = getWaterTimes(baseSec, key)
-  const nodes: TimeNode[] = []
-
-  // extreme 和 once 策略：最后一个浇水点与成熟同时发生，合并展示，循环不含最后一点
-  const loopEnd = (key === 'extreme' || key === 'once') ? waterTimes.length - 1 : waterTimes.length
-
-  let remaining = T // 剩余成熟时间，逐次减去等待时间与浇水减时
-
-  for (let i = 0; i < loopEnd; i++) {
-    const wt = waterTimes[i]
-    const prevTime = i > 0 ? waterTimes[i - 1] : 0
-    const gap = wt - prevTime
-    // 种下立即浇水：土地干涸(w=0)，消耗=W，减时=T/12
-    // 之后浇水：上次浇水后满水(w=W)，经过gap时间线性蒸发，消耗=min(gap,W)，减时=消耗/4
-    const reduction = i === 0 ? calcFullReduction(T) : calcWaterReduction(T, gap)
-    remaining = remaining - gap - reduction
-    if (i > 0) {
-      nodes.push({
-        index: nodes.length + 1,
-        title: `等${formatDuration(gap)}后浇水`,
-        desc: `浇水减${formatDuration(reduction)}，剩余${formatDuration(remaining)}，水分可以维持${formatDuration(W)}`,
-        offsetSeconds: wt,
-        timeStr: formatTimeFull(plantDate, wt),
-        isHarvest: false,
-      })
-    } else {
-      nodes.push({
-        index: 1,
-        title: '种下立即浇水',
-        desc: `浇水减${formatDuration(reduction)}，剩余${formatDuration(remaining)}，水分可以维持${formatDuration(W)}`,
-        offsetSeconds: 0,
-        timeStr: null,
-        isHarvest: false,
-      })
-    }
-  }
-
-  // 最终收菜节点
-  const finalGap = matureSeconds - (waterTimes.length > 0 ? waterTimes[waterTimes.length - 1] : 0)
-  let harvestTitle = '直接成熟'
-  let harvestDesc = ''
-  if (key === 'none') {
-    harvestTitle = '自然成熟'
-    harvestDesc = '不浇水，等待自然成熟'
-  } else if (key === 'extreme') {
-    // 极限：最后一步是浇水即熟，合并展示
-    const waitSec = waterTimes[waterTimes.length - 1] - waterTimes[waterTimes.length - 2]
-    const reduction = calcWaterReduction(T, waitSec)
-    harvestTitle = `等${formatDuration(waitSec)}后浇水秒熟`
-    harvestDesc = `浇水减${formatDuration(reduction)}，直接成熟`
-  } else if (key === 'once') {
-    // 佛系：水分先蒸发完，再等一段时间后浇水直接成熟
-    const waitSec = waterTimes[waterTimes.length - 1] - waterTimes[waterTimes.length - 2]
-    const dryWait = Math.max(0, waitSec - W) // 蒸发完后额外等待的时间
-    const reduction = calcWaterReduction(T, waitSec)
-    harvestTitle = `等${formatDuration(waitSec)}后浇水秒熟`
-    if (dryWait > 60) {
-      harvestDesc = `水分在${formatDuration(W)}后蒸发完，再等${formatDuration(dryWait)}，浇水减${formatDuration(reduction)}直接成熟`
-    } else {
-      harvestDesc = `浇水减${formatDuration(reduction)}，直接成熟`
-    }
-  } else if (key === 'diligent') {
-    // 勤奋：最后等剩余时间自然成熟
-    harvestTitle = `再等${formatDuration(remaining)}后自然成熟`
-    harvestDesc = '不需要浇水，直接自然成熟'
-  } else if (finalGap > 60) {
-    const reduction = calcWaterReduction(T, finalGap)
-    if (reduction > 0) {
-      harvestTitle = `再等${formatDuration(finalGap)}后浇水秒熟`
-      harvestDesc = `浇水减${formatDuration(reduction)}，直接成熟`
-    } else {
-      harvestTitle = `再等${formatDuration(finalGap)}后自然成熟`
-      harvestDesc = '不需要浇水，直接自然成熟'
-    }
-  } else {
-    harvestDesc = `减时${formatDuration(calcWaterReduction(T, finalGap))}，直接成熟`
-  }
-  nodes.push({
-    index: nodes.length + 1,
-    title: harvestTitle,
-    desc: harvestDesc,
-    offsetSeconds: matureSeconds,
-    timeStr: formatTimeFull(plantDate, matureSeconds),
-    isHarvest: true,
-  })
-
-  return nodes
-}
-
-/** 计算某次浇水的减时量
- * 水分从满值 W 线性蒸发，蒸发速率 = 1（每秒消耗 1 秒水分值），无湿润期。
- * 浇水减时 = 消耗水分 / 4 = min(gap, W) / 4
- * - 间隔 >= W（干涸后浇水）：消耗 = W，减时 = W/4 = T/12
- * - 间隔 < W（未干涸时浇水）：消耗 = gap，减时 = gap / 4
- */
-function calcWaterReduction(T: number, gap: number): number {
-  const W = T / 3
-  const consumed = Math.min(gap, W) // 实际消耗水分
-  return Math.round(consumed / 4)
-}
-
-/** 浇水减时（固定值）：每次在干涸后浇水，减时 = W/4 = T/12 */
-function calcFullReduction(T: number): number {
-  return Math.round(T / 12)
-}
-
-/** 策略结果 */
-const results = computed(() => {
-  if (baseSeconds.value == null) return []
-  return WATER_STRATEGIES.map((s) => {
-    const seconds = calcMaturitySeconds(baseSeconds.value!, s.key)
-    const nodes = buildTimeNodes(baseSeconds.value!, s.key, seconds, plantTime.value)
-    let matureAt: string | null = null
-    if (plantTime.value) {
-      const t = new Date(plantTime.value.getTime() + seconds * 1000)
-      matureAt = t.toLocaleString('zh-CN', {
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit',
-        hour: '2-digit',
-        minute: '2-digit',
-      })
-    }
-    return { ...s, seconds, formatted: formatDuration(seconds), nodes, matureAt }
-  })
+/** 过滤后的显示结果 */
+const filteredResults = computed(() => {
+  return calculationResults.value.filter((result) =>
+    result.strategy === selectedStrategy.value,
+  )
 })
+
+/** 策略选项配置 */
+const strategyOptions = [
+  { value: 'none', label: '自然成熟' },
+  { value: 'once', label: '佛系浇水' },
+  { value: 'diligent', label: '勤奋浇水' },
+  { value: 'extreme', label: '极限浇水' },
+]
 </script>
 
 <template>
@@ -329,6 +181,7 @@ const results = computed(() => {
             type="datetime"
             placeholder="选择种下时间"
             format="YYYY-MM-DD HH:mm"
+            popper-class="compact-datetime-picker"
             style="width: 220px"
           />
         </el-form-item>
@@ -376,43 +229,69 @@ const results = computed(() => {
 
     <!-- 结果卡片区 -->
     <template v-if="baseSeconds != null">
-      <div class="section-title" style="margin-top: 28px">
-        <span>收菜时间预估</span>
+      <div class="section-header">
+        <span class="section-title-text">收菜时间预估</span>
         <el-button
-          class="mechanism-btn"
+          class="info-btn"
           :icon="InfoFilled"
           text
+          size="small"
           @click="showMechanism = true"
         >
           计算原理
         </el-button>
-      </div>
-      <div class="result-grid">
-        <div v-for="item in results" :key="item.key" class="result-card page-card">
-          <h3>{{ item.label }}</h3>
-          <p class="time">{{ item.formatted }}</p>
-          <p class="desc">{{ item.desc }}</p>
-          <p v-if="item.matureAt" class="mature-at">收菜时间：{{ item.matureAt }}</p>
-          <!-- 浇水/收菜节点列表 -->
-          <div v-if="item.nodes.length > 0" class="r-nodelist">
-            <div
-              v-for="node in item.nodes"
-              :key="node.index"
-              class="r-node-item"
-              :class="{ 'is-harvest': node.isHarvest }"
+        <div class="strategy-switcher">
+          <el-radio-group v-model="selectedStrategy" size="small">
+            <el-radio-button
+              v-for="opt in strategyOptions"
+              :key="opt.value"
+              :value="opt.value"
             >
-              <span class="r-node-num">{{ node.index }}</span>
-              <div class="r-node-body">
-                <div class="r-node-title">{{ node.title }}</div>
-                <div class="r-node-desc">{{ node.desc }}</div>
-              </div>
-              <div v-if="node.timeStr" class="r-node-time">
-                <el-icon><AlarmClock /></el-icon>
-                {{ node.timeStr }}
+              {{ opt.label }}
+            </el-radio-button>
+          </el-radio-group>
+        </div>
+      </div>
+      
+      <div v-if="isCalculating" class="loading-tip">
+        <el-icon class="is-loading"><Loading /></el-icon>
+        正在计算...
+      </div>
+      
+      <div class="result-transition-wrapper">
+        <transition name="result-fade" mode="out-in">
+          <div v-if="filteredResults.length === 0" key="empty" class="empty-tip">
+            暂无数据
+          </div>
+          
+          <div v-else :key="baseSeconds" class="result-grid">
+            <div v-for="item in filteredResults" :key="item.strategy" class="result-card page-card">
+              <h3>{{ item.label }}</h3>
+              <p class="time">{{ item.formatted }}</p>
+              <p class="desc">{{ item.description }}</p>
+              <p v-if="item.matureAt" class="mature-at">收菜时间：{{ item.matureAt }}</p>
+              <!-- 浇水/收菜节点列表 -->
+              <div v-if="item.nodes.length > 0" class="r-nodelist">
+                <div
+                  v-for="node in item.nodes"
+                  :key="node.index"
+                  class="r-node-item"
+                  :class="{ 'is-harvest': node.harvest }"
+                >
+                  <span class="r-node-num">{{ node.index }}</span>
+                  <div class="r-node-body">
+                    <div class="r-node-title">{{ node.title }}</div>
+                    <div class="r-node-desc">{{ node.desc }}</div>
+                  </div>
+                  <div v-if="node.timeStr && !(node.index === 1 && !node.harvest)" class="r-node-time">
+                    <el-icon><AlarmClock /></el-icon>
+                    {{ node.timeStr }}
+                  </div>
+                </div>
               </div>
             </div>
           </div>
-        </div>
+        </transition>
       </div>
     </template>
 
@@ -483,25 +362,104 @@ const results = computed(() => {
 }
 
 .form-section {
-  margin-bottom: 20px;
+  margin-bottom: 14px;
+  padding: 16px 18px;
+}
+
+.page-title {
+  font-size: 20px;
+  margin: 0 0 6px 0;
+  font-weight: 700;
+  color: var(--fh-green);
+}
+
+.page-desc {
+  font-size: 13px;
+  color: var(--fh-muted);
+  margin: 0 0 14px 0;
+  line-height: 1.5;
 }
 
 /* 分组标题行 */
 .section-title {
   display: flex;
   align-items: center;
-  gap: 8px;
-  font-size: 15px;
+  gap: 5px;
+  font-size: 13px;
   font-weight: 700;
   color: var(--fh-green);
-  margin-bottom: 12px;
+  margin-bottom: 8px;
   line-height: 1;
+  flex-wrap: wrap;
 }
 
 .section-sub {
-  font-size: 13px;
+  font-size: 11px;
   font-weight: 400;
   color: var(--fh-muted);
+}
+
+/* 结果区域头部 */
+.section-header {
+  margin-top: 16px;
+  margin-bottom: 10px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.section-title-text {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--fh-green);
+  white-space: nowrap;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+}
+
+/* 计算原理按钮 - 美化样式 */
+.info-btn {
+  font-size: 12px;
+  color: #409eff;
+  padding: 4px 10px;
+  margin-left: 6px;
+  vertical-align: middle;
+  line-height: 1;
+  background: #ecf5ff;
+  border: 1.5px solid #b3d8ff;
+  border-radius: 4px;
+  transition: all 0.2s;
+}
+
+.info-btn:hover {
+  color: #1d6bc0;
+  background: #c9e5ff !important;
+  border-color: #66b1ff;
+}
+
+.info-btn :deep(.el-icon) {
+  font-size: 13px;
+  vertical-align: middle;
+  margin-right: 2px;
+}
+
+/* 策略切换器 */
+.strategy-switcher {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+}
+
+.strategy-switcher :deep(.el-radio-group) {
+  display: inline-flex;
+}
+
+.strategy-switcher :deep(.el-radio-button__inner) {
+  padding: 3px 10px;
+  font-size: 12px;
+  line-height: 1.3;
+  font-weight: 500;
 }
 
 .mode-switch {
@@ -517,19 +475,20 @@ const results = computed(() => {
 }
 
 .section-title :deep(.el-radio-button__inner) {
-  padding: 4px 12px;
-  font-size: 13px;
-  line-height: 1.4;
+  padding: 3px 10px;
+  font-size: 12px;
+  line-height: 1.3;
+  font-weight: 500;
 }
 
 .selected-badge {
   margin-left: auto;
   background: var(--fh-green);
   color: #fff;
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 500;
-  padding: 4px 14px;
-  border-radius: 14px;
+  padding: 3px 12px;
+  border-radius: 12px;
   line-height: 1;
 }
 
@@ -537,24 +496,24 @@ const results = computed(() => {
   margin-left: auto;
   background: #f0c060;
   color: #5a3e00;
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 500;
-  padding: 4px 14px;
-  border-radius: 14px;
+  padding: 3px 12px;
+  border-radius: 12px;
   line-height: 1;
 }
 
 /* 时间卡片网格 */
 .time-cards {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-  gap: 12px;
-  margin-bottom: 20px;
+  grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+  gap: 8px;
+  margin-bottom: 14px;
 }
 
 .time-card {
   text-align: center;
-  padding: 18px 12px;
+  padding: 12px 8px;
   cursor: pointer;
   transition: all 0.2s;
   border: 2px solid transparent;
@@ -578,14 +537,14 @@ const results = computed(() => {
 }
 
 .time-value {
-  font-size: 20px;
+  font-size: 16px;
   font-weight: 700;
   color: #2c3e2e;
-  margin-bottom: 4px;
+  margin-bottom: 2px;
 }
 
 .time-crop-count {
-  font-size: 12px;
+  font-size: 11px;
   color: var(--fh-muted);
 }
 
@@ -602,15 +561,24 @@ const results = computed(() => {
   padding: 20px 0;
 }
 
+.empty-tip {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--fh-muted);
+  font-size: 14px;
+  padding: 40px 0;
+  background: #fafbfc;
+  border-radius: 8px;
+  border: 2px dashed #e0e6ea;
+}
+
 /* 计算原理按钮 */
 .mechanism-btn {
   margin-left: auto;
   font-size: 14px;
   color: #909399;
-}
-
-.mechanism-btn:hover {
-  color: var(--fh-green);
+  padding: 4px 8px;
 }
 
 /* 弹窗内容 */
@@ -677,49 +645,76 @@ const results = computed(() => {
 .result-grid {
   display: flex;
   flex-direction: column;
-  gap: 16px;
-  margin-bottom: 24px;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+/* 动画容器 */
+.result-transition-wrapper {
+  position: relative;
+  overflow: hidden;
+}
+
+/* 切换时间时的过渡动画 */
+.result-fade-enter-active {
+  transition: opacity 0.3s ease;
+}
+
+.result-fade-leave-active {
+  transition: opacity 0.25s ease;
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+}
+
+.result-fade-enter-from {
+  opacity: 0;
+}
+
+.result-fade-leave-to {
+  opacity: 0;
 }
 
 .result-card h3 {
-  margin: 0 0 8px;
-  font-size: 16px;
+  margin: 0 0 6px;
+  font-size: 15px;
   color: var(--fh-green);
 }
 
 .time {
-  margin: 0 0 8px;
-  font-size: 22px;
+  margin: 0 0 6px;
+  font-size: 20px;
   font-weight: 700;
 }
 
 .desc {
   margin: 0;
-  font-size: 13px;
+  font-size: 12px;
   color: var(--fh-muted);
 }
 
 .mature-at {
-  margin: 10px 0 0;
-  font-size: 15px;
+  margin: 8px 0 0;
+  font-size: 14px;
   color: var(--fh-green-light);
   font-weight: 700;
 }
 
 /* 结果卡片内节点纵向列表，每个节点占一行 */
 .r-nodelist {
-  margin-top: 12px;
+  margin-top: 10px;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 6px;
 }
 
 .r-node-item {
   display: flex;
   flex-direction: row;
   align-items: center;
-  gap: 10px;
-  padding: 4px 0;
+  gap: 8px;
+  padding: 3px 0;
   width: 650px;
   max-width: 100%;
 }
@@ -738,14 +733,14 @@ const results = computed(() => {
 }
 
 .r-node-num {
-  width: 22px;
-  height: 22px;
-  line-height: 22px;
+  width: 20px;
+  height: 20px;
+  line-height: 20px;
   text-align: center;
   background: var(--fh-green);
   color: #fff;
   border-radius: 50%;
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 700;
   flex-shrink: 0;
 }
@@ -760,7 +755,7 @@ const results = computed(() => {
 }
 
 .r-node-title {
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 700;
   color: #303133;
   line-height: 1.4;
@@ -768,7 +763,7 @@ const results = computed(() => {
 }
 
 .r-node-desc {
-  font-size: 12px;
+  font-size: 11px;
   color: #909399;
   line-height: 1.4;
 }
@@ -776,8 +771,8 @@ const results = computed(() => {
 .r-node-time {
   display: flex;
   align-items: center;
-  gap: 4px;
-  font-size: 16px;
+  gap: 3px;
+  font-size: 15px;
   font-weight: 700;
   color: #e65100;
   white-space: nowrap;

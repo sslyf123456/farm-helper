@@ -19,8 +19,11 @@
    - [GET /api/static/cultivation](#get-apistaticcultivation)
    - [GET /api/static/mutation-rates](#get-apistaticmutation-rates)
    - [GET /api/static/rewards](#get-apistaticrewards)
-3. [数据来源说明](#数据来源说明)
-4. [通用错误码](#通用错误码)
+3. [计算器接口 `/api/calculator`](#计算器接口-apicalculator)
+   - [POST /api/calculator/watering](#post-apicalculatorwatering)
+   - [POST /api/calculator/watering/single](#post-apicalculatorwatering-single)
+4. [数据来源说明](#数据来源说明)
+5. [通用错误码](#通用错误码)
 
 ---
 
@@ -426,6 +429,199 @@ GET /api/static/rewards
 
 ---
 
+## 计算器接口 `/api/calculator`
+
+---
+
+### POST /api/calculator/watering
+
+计算所有浇水策略（自然成熟、佛系浇水、勤奋浇水、极限浇水）的成熟时间及详细节点。
+
+**请求**
+
+```
+POST /api/calculator/watering
+Content-Type: application/json
+```
+
+**请求体**
+
+```json
+{
+  "baseSeconds": 3600,
+  "plantTime": "2026-06-16T10:00:00"
+}
+```
+
+**请求字段说明**
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| baseSeconds | number | 是 | 作物基础成熟时间（秒），如 3600 表示 1小时 |
+| plantTime | string | 否 | 种植时间（ISO-8601格式，如 "2026-06-16T10:00:00"），用于计算具体收菜时刻 |
+
+**响应示例（200 OK）**
+
+```json
+[
+  {
+    "strategy": "none",
+    "label": "自然成熟",
+    "description": "不浇水，耗时最长",
+    "matureSeconds": 3600,
+    "formatted": "1小时",
+    "matureAt": "2026-06-16 11:00",
+    "nodes": [
+      {
+        "index": 1,
+        "title": "自然成熟",
+        "desc": "不浇水，等待自然成熟",
+        "offsetSeconds": 3600,
+        "timeStr": "2026-06-16 11:00",
+        "harvest": true
+      }
+    ]
+  },
+  {
+    "strategy": "once",
+    "label": "佛系浇水",
+    "description": "共浇水2次，缩短约16.7%的成熟时间",
+    "matureSeconds": 3000,
+    "formatted": "50分钟",
+    "matureAt": "2026-06-16 10:50",
+    "nodes": [
+      {
+        "index": 1,
+        "title": "种下立即浇水",
+        "desc": "浇水减5分钟，剩余55分钟，水分可以维持20分钟",
+        "offsetSeconds": 0,
+        "timeStr": null,
+        "harvest": false
+      },
+      {
+        "index": 2,
+        "title": "等50分钟后浇水秒熟",
+        "desc": "浇水减5分钟，直接成熟",
+        "offsetSeconds": 3000,
+        "timeStr": "2026-06-16 10:50",
+        "harvest": true
+      }
+    ]
+  }
+]
+```
+
+**响应字段说明**
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| strategy | string | 策略标识：none（自然成熟）、once（佛系浇水）、diligent（勤奋浇水）、extreme（极限浇水） |
+| label | string | 策略中文标签 |
+| description | string | 策略描述 |
+| matureSeconds | number | 实际成熟秒数 |
+| formatted | string | 格式化的成熟时间（中文可读形式） |
+| matureAt | string | 成熟时刻（格式 "yyyy-MM-dd HH:mm"，仅当请求中提供 plantTime 时返回） |
+| nodes | array | 浇水/收菜节点列表 |
+
+**TimeNode 字段说明**
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| index | number | 步骤编号（从1开始） |
+| title | string | 节点标题，如 "种下立即浇水"、"等20分钟后浇水" |
+| desc | string | 节点描述，包含减时、剩余时间、水分维持时间等信息 |
+| offsetSeconds | number | 该节点距种下的秒数 |
+| timeStr | string \| null | 具体时间字符串（格式 "yyyy-MM-dd HH:mm"），种下立即浇水节点为 null |
+| harvest | boolean | 是否为最终收菜节点 |
+
+---
+
+### POST /api/calculator/watering/single
+
+计算单个浇水策略的成熟时间及详细节点。
+
+**请求**
+
+```
+POST /api/calculator/watering/single
+Content-Type: application/json
+```
+
+**请求体**
+
+```json
+{
+  "baseSeconds": 3600,
+  "strategy": "diligent",
+  "plantTime": "2026-06-16T10:00:00"
+}
+```
+
+**请求字段说明**
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| baseSeconds | number | 是 | 作物基础成熟时间（秒） |
+| strategy | string | 是 | 浇水策略：none、once、diligent、extreme |
+| plantTime | string | 否 | 种植时间（ISO-8601格式） |
+
+**响应示例（200 OK）**
+
+```json
+{
+  "strategy": "diligent",
+  "label": "勤奋浇水",
+  "description": "共浇水3次，缩短25%的成熟时间",
+  "matureSeconds": 2700,
+  "formatted": "45分钟",
+  "matureAt": "2026-06-16 10:45",
+  "nodes": [
+    {
+      "index": 1,
+      "title": "种下立即浇水",
+      "desc": "浇水减5分钟，剩余55分钟，水分可以维持20分钟",
+      "offsetSeconds": 0,
+      "timeStr": null,
+      "harvest": false
+    },
+    {
+      "index": 2,
+      "title": "等20分钟后浇水",
+      "desc": "浇水减5分钟，剩余30分钟，水分可以维持20分钟",
+      "offsetSeconds": 1200,
+      "timeStr": "2026-06-16 10:20",
+      "harvest": false
+    },
+    {
+      "index": 3,
+      "title": "等20分钟后浇水",
+      "desc": "浇水减5分钟，剩余5分钟，水分可以维持20分钟",
+      "offsetSeconds": 2400,
+      "timeStr": "2026-06-16 10:40",
+      "harvest": false
+    },
+    {
+      "index": 4,
+      "title": "再等5分钟后自然成熟",
+      "desc": "不需要浇水，直接自然成熟",
+      "offsetSeconds": 2700,
+      "timeStr": "2026-06-16 10:45",
+      "harvest": true
+    }
+  ]
+}
+```
+
+**响应字段说明**
+
+同 [POST /api/calculator/watering](#post-apicalculatorwatering)。
+
+**错误响应（400 Bad Request）**
+
+当请求参数不合法时（如 baseSeconds ≤ 0 或缺少 strategy），返回 HTTP 400。
+
+---
+
 ## 数据来源说明
 
 所有数据从 `data/csv/` 目录下的 7 个 CSV 文件中读取，CSV 由 `scripts/xls_to_csv.py` 从 `data/raw/farm_data.xls` 导出，导出时自动将中文表头映射为英文字段名。
@@ -456,4 +652,4 @@ GET /api/static/rewards
 
 ---
 
-*文档最后更新：2026-06-13*
+*文档最后更新：2026-06-16*

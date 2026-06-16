@@ -44,7 +44,6 @@ const activeMenu = computed(() => route.path)
     <el-main class="main">
       <router-view />
     </el-main>
-    <el-footer class="footer">王者荣耀农场助手 · 个人数据整理工具</el-footer>
   </el-container>
 </template>
 
@@ -101,14 +100,5 @@ const activeMenu = computed(() => route.path)
   /* 覆盖 el-main 默认 overflow:auto，避免与浏览器底部出现双横向滚动条 */
   overflow-x: visible;
   overflow-y: visible;
-}
-
-.footer {
-  text-align: center;
-  color: var(--fh-muted);
-  font-size: 13px;
-  background: transparent;
-  height: 48px;
-  line-height: 48px;
 }
 </style>
