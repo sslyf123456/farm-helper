@@ -5,7 +5,6 @@ import { Loading } from '@element-plus/icons-vue'
 import { fetchCrops, type CsvRow } from '@/api/static'
 import { calculateAllStrategies, type WateringResponse } from '@/api/calculator'
 import {
-  WATER_STRATEGIES,
   formatDuration,
   formatHarvestTime,
   parseHarvestTime,
@@ -146,6 +145,19 @@ const strategyOptions = [
   { value: 'diligent', label: '勤奋浇水' },
   { value: 'extreme', label: '极限浇水' },
 ]
+
+/** 搜索关键词 */
+const searchQuery = ref('')
+
+/** 根据搜索关键词过滤的作物列表 */
+const searchFilteredCrops = computed(() => {
+  if (!searchQuery.value) return filteredCrops.value
+  const query = searchQuery.value.toLowerCase()
+  return filteredCrops.value.filter((c) => {
+    const name = String(c['name']).toLowerCase()
+    return name.includes(query)
+  })
+})
 </script>
 
 <template>
@@ -164,9 +176,11 @@ const strategyOptions = [
             clearable
             placeholder="可选，不选时下方卡片可自由切换"
             style="width: 280px"
+            @visible-change="(visible: boolean) => { if (!visible) searchQuery = '' }"
+            :filter-method="(query: string) => { searchQuery = query }"
           >
             <el-option
-              v-for="c in filteredCrops"
+              v-for="c in searchFilteredCrops"
               :key="String(c['name'])"
               :label="`Lv.${c['unlock_level']} ${c['name']}（${formatHarvestTime(c['harvest_time'])}）`"
               :value="String(c['name'])"
@@ -199,7 +213,7 @@ const strategyOptions = [
         </el-radio-group>
       </div>
       <span v-if="selectedCropName" class="locked-badge">
-        已锁定为 {{ selectedCropName }}
+        已锁定为{{ selectedCropName }}
       </span>
       <span v-else-if="selectedTimeSeconds != null" class="selected-badge">
         已选：{{ formatDuration(selectedTimeSeconds) }}
@@ -555,10 +569,20 @@ const strategyOptions = [
 .loading-tip {
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 8px;
   color: var(--fh-muted);
   font-size: 14px;
   padding: 20px 0;
+  line-height: 1;
+}
+
+.loading-tip .el-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  vertical-align: middle;
 }
 
 .empty-tip {
