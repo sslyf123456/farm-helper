@@ -2,8 +2,14 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import { InfoFilled, AlarmClock } from '@element-plus/icons-vue'
 import { Loading } from '@element-plus/icons-vue'
+import { ElMessage } from 'element-plus'
 import { fetchCrops, type CsvRow } from '@/api/static'
-import { calculateAllStrategies, type WateringResponse } from '@/api/calculator'
+import { 
+  calculateAllStrategies, 
+  calculateAllStrategiesReverse,
+  calculateAllStrategiesReverseByMatureTime,
+  type WateringResponse 
+} from '@/api/calculator'
 import {
   formatDuration,
   formatHarvestTime,
@@ -21,15 +27,32 @@ const plantTime = ref<Date>(new Date())
 const timeMode = ref<'common' | 'all'>('common')
 /** 计算原理弹窗 */
 const showMechanism = ref(false)
-/** 是否正在计算 */
-const isCalculating = ref(false)
 /** 计算结果 */
 const calculationResults = ref<WateringResponse[]>([])
 /** 选中的策略（用于过滤显示） */
 const selectedStrategy = ref<string>('extreme')
 
+/** 计算模式：forward = 正向（从种植时间计算），reverse = 反向（从剩余成熟时间计算） */
+const calculationMode = ref<'forward' | 'reverse'>('forward')
+
+/** 反向计算输入：输入类型（remaining = 剩余成熟时间，matureTime = 成熟时间） */
+const reverseInputType = ref<'remaining' | 'matureTime'>('remaining')
+/** 反向计算：剩余成熟时间（小时） */
+const remainingHours = ref<number | null>(0)
+/** 反向计算：剩余成熟时间（分钟） */
+const remainingMinutes = ref<number | null>(0)
+/** 反向计算：成熟时间 */
+const matureTime = ref<Date | null>(null)
+/** 反向计算：水分维持度（小时） */
+const moistureHours = ref<number | null>(0)
+/** 反向计算：水分维持度（分钟） */
+const moistureMinutes = ref<number | null>(0)
+/** 反向计算：当前时间（默认为现在） */
+const currentTime = ref<Date>(new Date())
+
 onMounted(async () => {
   plantTime.value = new Date()
+  currentTime.value = new Date()
   try {
     crops.value = await fetchCrops()
   } catch {
@@ -105,25 +128,141 @@ watch(timeMode, (mode) => {
   }
 })
 
+/** 切换输入方式时，清空另一种方式的输入内容 */
+watch(reverseInputType, (mode) => {
+  if (mode === 'remaining') {
+    matureTime.value = null
+  } else {
+    remainingHours.value = 0
+    remainingMinutes.value = 0
+  }
+  moistureHours.value = 0
+  moistureMinutes.value = 0
+})
+
 /** 最终用于计算的基础秒数 */
 const baseSeconds = computed(() => selectedTimeSeconds.value)
 
-/** 当基础秒数或种植时间变化时，自动调用后端计算 */
-watch([baseSeconds, plantTime], async ([newBaseSeconds, newPlantTime]) => {
-  if (newBaseSeconds != null && newBaseSeconds > 0) {
-    isCalculating.value = true
-    try {
-      calculationResults.value = await calculateAllStrategies(newBaseSeconds, newPlantTime)
-    } catch (error) {
-      console.error('计算失败:', error)
-      calculationResults.value = []
-    } finally {
-      isCalculating.value = false
+/** 计算剩余秒数（从小时和分钟输入），返回 null 表示未填写 */
+const remainingSeconds = computed(() => {
+  const hours = remainingHours.value
+  const minutes = remainingMinutes.value
+  if (hours == null || minutes == null) {
+    return null
+  }
+  return hours * 3600 + minutes * 60
+})
+
+/** 计算水分维持度秒数（从小时和分钟输入），返回 null 表示未填写 */
+const moistureSeconds = computed(() => {
+  const hours = moistureHours.value
+  const minutes = moistureMinutes.value
+  if (hours == null || minutes == null) {
+    return null
+  }
+  return hours * 3600 + minutes * 60
+})
+
+/** 手动触发计算 */
+async function handleCalculate() {
+  // 先进行所有验证，验证失败直接返回
+  if (!baseSeconds.value || baseSeconds.value <= 0) {
+    ElMessage.warning('请先选择成熟时间')
+    calculationResults.value = []
+    return
+  }
+
+  if (calculationMode.value === 'reverse') {
+    if (reverseInputType.value === 'remaining') {
+      // 剩余时间模式验证
+      if (remainingSeconds.value == null || remainingSeconds.value < 0) {
+        ElMessage.warning('请填写剩余成熟时间（小时和分钟）')
+        calculationResults.value = []
+        return
+      }
+      if (remainingSeconds.value > baseSeconds.value) {
+        ElMessage.warning('剩余成熟时间不能超过作物周期')
+        calculationResults.value = []
+        return
+      }
+      if (moistureSeconds.value == null) {
+        ElMessage.warning('请填写水分维持度（小时和分钟）')
+        calculationResults.value = []
+        return
+      }
+      if (moistureSeconds.value > baseSeconds.value / 3) {
+        ElMessage.warning('水分维持度不能超过作物周期的三分之一')
+        calculationResults.value = []
+        return
+      }
+    } else {
+      // 成熟时间模式验证
+      if (!matureTime.value) {
+        ElMessage.warning('请选择成熟时间')
+        calculationResults.value = []
+        return
+      }
+      if (!currentTime.value) {
+        ElMessage.warning('请选择当前时间')
+        calculationResults.value = []
+        return
+      }
+      // 成熟时间 - 当前时间 不能超过作物周期
+      const diffMs = matureTime.value.getTime() - currentTime.value.getTime()
+      if (diffMs <= 0) {
+        ElMessage.warning('成熟时间不能早于当前时间')
+        calculationResults.value = []
+        return
+      }
+      if (Math.floor(diffMs / 1000) > baseSeconds.value) {
+        ElMessage.warning('成熟时间减当前时间不能超过作物周期')
+        calculationResults.value = []
+        return
+      }
+      if (moistureSeconds.value == null) {
+        ElMessage.warning('请填写水分维持度（小时和分钟）')
+        calculationResults.value = []
+        return
+      }
+      if (moistureSeconds.value > baseSeconds.value / 3) {
+        ElMessage.warning('水分维持度不能超过作物周期的三分之一')
+        calculationResults.value = []
+        return
+      }
     }
-  } else {
+  }
+
+  // 验证通过后进行计算
+  try {
+    if (calculationMode.value === 'forward') {
+      // 正向计算
+      calculationResults.value = await calculateAllStrategies(
+        baseSeconds.value,
+        plantTime.value
+      )
+    } else {
+      // 反向计算
+      if (reverseInputType.value === 'remaining') {
+        calculationResults.value = await calculateAllStrategiesReverse(
+          baseSeconds.value,
+          remainingSeconds.value!,
+          moistureSeconds.value!,
+          currentTime.value
+        )
+      } else {
+        calculationResults.value = await calculateAllStrategiesReverseByMatureTime(
+          baseSeconds.value,
+          matureTime.value!,
+          moistureSeconds.value!,
+          currentTime.value
+        )
+      }
+    }
+  } catch (error) {
+    console.error('计算失败:', error)
     calculationResults.value = []
   }
-}, { immediate: true })
+}
 
 /** 选择时间卡片 */
 function selectTime(seconds: number) {
@@ -158,6 +297,28 @@ const searchFilteredCrops = computed(() => {
     return name.includes(query)
   })
 })
+
+/** 动态计算表单label宽度 */
+const formLabelWidth = computed(() => {
+  const labels = [
+    '计算模式',
+    '选择作物',
+    '种下时间',
+    '输入方式',
+    '剩余时间',
+    '成熟时间',
+    '水分维持度',
+    '当前时间'
+  ]
+  
+  // 找出最长的label
+  const maxLength = Math.max(...labels.map(l => l.length))
+  
+  // 每个中文字符按15px计算，加上30px的padding
+  const width = maxLength * 15 + 30
+  
+  return `${width}px`
+})
 </script>
 
 <template>
@@ -167,7 +328,14 @@ const searchFilteredCrops = computed(() => {
       <h1 class="page-title">收菜计算器</h1>
       <p class="page-desc">选择作物或直接点击成熟时间卡片，查看各浇水策略下的收菜时间</p>
 
-      <el-form label-width="70px" label-position="left">
+      <el-form :label-width="formLabelWidth" label-position="left">
+        <!-- 计算模式切换 -->
+        <el-form-item label="计算模式">
+          <el-radio-group v-model="calculationMode" size="default" class="mode-radio-group">
+            <el-radio-button value="forward">正向计算</el-radio-button>
+            <el-radio-button value="reverse">反向计算</el-radio-button>
+          </el-radio-group>
+        </el-form-item>
         <!-- 作物选择（可选） -->
         <el-form-item label="选择作物">
           <el-select
@@ -188,16 +356,91 @@ const searchFilteredCrops = computed(() => {
           </el-select>
         </el-form-item>
 
-        <!-- 种下时间 -->
-        <el-form-item label="种下时间">
-          <el-date-picker
-            v-model="plantTime"
-            type="datetime"
-            placeholder="选择种下时间"
-            format="YYYY-MM-DD HH:mm"
-            popper-class="compact-datetime-picker"
-            style="width: 220px"
-          />
+        <!-- 正向计算模式的表单 -->
+        <template v-if="calculationMode === 'forward'">
+          <el-form-item label="种下时间">
+            <el-date-picker
+              v-model="plantTime"
+              type="datetime"
+              placeholder="选择种下时间"
+              format="YYYY-MM-DD HH:mm"
+              popper-class="compact-datetime-picker"
+              style="width: 220px"
+            />
+          </el-form-item>
+        </template>
+
+        <!-- 反向计算模式的表单 -->
+        <template v-else>
+          <el-form-item label="输入方式">
+            <el-radio-group v-model="reverseInputType" size="default" class="mode-radio-group">
+              <el-radio-button value="remaining">剩余成熟时间</el-radio-button>
+              <el-radio-button value="matureTime">成熟时间</el-radio-button>
+            </el-radio-group>
+          </el-form-item>
+
+          <el-form-item v-if="reverseInputType === 'remaining'" label="剩余成熟时间">
+            <div style="display: flex; gap: 8px; align-items: center;">
+              <el-input
+                v-model.number="remainingHours"
+                style="width: 55px"
+              />
+              <span>小时</span>
+              <el-input
+                v-model.number="remainingMinutes"
+                style="width: 55px"
+              />
+              <span>分钟</span>
+            </div>
+          </el-form-item>
+
+          <el-form-item v-else label="成熟时间">
+            <el-date-picker
+              v-model="matureTime"
+              type="datetime"
+              placeholder="选择成熟时间"
+              format="YYYY-MM-DD HH:mm"
+              popper-class="compact-datetime-picker"
+              style="width: 220px"
+            />
+          </el-form-item>
+
+          <el-form-item label="水分维持度">
+            <div style="display: flex; gap: 8px; align-items: center;">
+              <el-input
+                v-model.number="moistureHours"
+                style="width: 55px"
+              />
+              <span>小时</span>
+              <el-input
+                v-model.number="moistureMinutes"
+                style="width: 55px"
+              />
+              <span>分钟</span>
+            </div>
+          </el-form-item>
+
+          <el-form-item label="当前时间">
+            <el-date-picker
+              v-model="currentTime"
+              type="datetime"
+              placeholder="选择当前时间"
+              format="YYYY-MM-DD HH:mm"
+              popper-class="compact-datetime-picker"
+              style="width: 220px"
+            />
+          </el-form-item>
+        </template>
+
+        <!-- 计算按钮 -->
+        <el-form-item>
+          <button 
+            type="button"
+            class="calc-button"
+            @click="handleCalculate"
+          >
+            <span class="button-text">开始计算</span>
+          </button>
         </el-form-item>
       </el-form>
     </div>
@@ -207,7 +450,7 @@ const searchFilteredCrops = computed(() => {
       <span>成熟时间</span>
       <span class="section-sub">（必选，点击卡片）</span>
       <div class="mode-switch">
-        <el-radio-group v-model="timeMode" size="small">
+        <el-radio-group v-model="timeMode" size="small" class="time-mode-group">
           <el-radio-button value="common">常见</el-radio-button>
           <el-radio-button value="all">所有</el-radio-button>
         </el-radio-group>
@@ -267,18 +510,13 @@ const searchFilteredCrops = computed(() => {
         </div>
       </div>
       
-      <div v-if="isCalculating" class="loading-tip">
-        <el-icon class="is-loading"><Loading /></el-icon>
-        正在计算...
-      </div>
-      
       <div class="result-transition-wrapper">
         <transition name="result-fade" mode="out-in">
           <div v-if="filteredResults.length === 0" key="empty" class="empty-tip">
             暂无数据
           </div>
           
-          <div v-else :key="baseSeconds" class="result-grid">
+          <div v-else :key="selectedStrategy" class="result-grid">
             <div v-for="item in filteredResults" :key="item.strategy" class="result-card page-card">
               <h3>{{ item.label }}</h3>
               <p class="time">{{ item.formatted }}</p>
@@ -394,6 +632,60 @@ const searchFilteredCrops = computed(() => {
   line-height: 1.5;
 }
 
+/* 计算按钮 */
+.calc-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 24px;
+  background: #e67e22;
+  border: none;
+  border-radius: 6px;
+  color: white;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.calc-button:hover {
+  background: #d35400;
+  transform: translateY(-1px);
+}
+
+.calc-button:active {
+  transform: translateY(0);
+}
+
+.calc-button:disabled {
+  background: #f0b27a;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* 计算模式单选按钮组 - 紫色系（只针对计算模式这一行） */
+.mode-radio-group :deep(.el-radio-button__original-radio:checked + .el-radio-button__inner) {
+  background-color: #9b59b6;
+  border-color: #9b59b6;
+  color: white;
+  box-shadow: none;
+}
+
+.mode-radio-group :deep(.el-radio-button__original-radio:checked + .el-radio-button__inner:hover) {
+  background-color: #8e44ad;
+  border-color: #8e44ad;
+}
+
+.mode-radio-group :deep(.el-radio-button__inner:hover) {
+  color: #8e44ad;
+}
+
+/* 输入方式单选按钮组 - 保持Element Plus默认蓝色系 */
+
+.button-text {
+  line-height: 1;
+}
+
 /* 分组标题行 */
 .section-title {
   display: flex;
@@ -492,6 +784,14 @@ const searchFilteredCrops = computed(() => {
   padding: 3px 10px;
   font-size: 12px;
   line-height: 1.3;
+  font-weight: 500;
+}
+
+/* 成熟时间卡片区域的切换按钮*/
+.time-mode-group :deep(.el-radio-button__inner) {
+  padding: 3px 8px;
+  font-size: 11px;
+  line-height: 1.2;
   font-weight: 500;
 }
 

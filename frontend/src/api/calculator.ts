@@ -53,6 +53,16 @@ export interface WateringRequest {
   strategy?: WaterStrategy
   /** 种植时间（ISO-8601格式字符串，可选） */
   plantTime?: string
+  /** 计算模式：forward（正向）或 reverse（反向） */
+  mode?: 'forward' | 'reverse'
+  /** 剩余成熟时间（秒，仅用于 reverse 模式） */
+  remainingSeconds?: number
+  /** 成熟时间点（ISO-8601格式字符串，仅用于 reverse 模式） */
+  matureTime?: string
+  /** 当前时间（ISO-8601格式字符串，仅用于 reverse 模式） */
+  currentTime?: string
+  /** 水分维持时间（秒，表示当前水分还能维持多久，仅用于 reverse 模式） */
+  moistureSeconds?: number
 }
 
 /**
@@ -70,7 +80,7 @@ function formatLocalDateTime(date: Date): string {
 }
 
 /**
- * 计算所有浇水策略的结果
+ * 计算所有浇水策略的结果（正向模式）
  */
 export async function calculateAllStrategies(
   baseSeconds: number,
@@ -78,7 +88,50 @@ export async function calculateAllStrategies(
 ): Promise<WateringResponse[]> {
   const request: WateringRequest = {
     baseSeconds,
+    mode: 'forward',
     plantTime: plantTime ? formatLocalDateTime(plantTime) : undefined,
+  }
+
+  const response = await apiClient.post<WateringResponse[]>('/calculator/watering', request)
+  return response.data
+}
+
+/**
+ * 计算所有浇水策略的结果（反向模式 - 使用剩余成熟时间）
+ */
+export async function calculateAllStrategiesReverse(
+  baseSeconds: number,
+  remainingSeconds: number,
+  moistureSeconds: number,
+  currentTime?: Date,
+): Promise<WateringResponse[]> {
+  const request: WateringRequest = {
+    baseSeconds,
+    mode: 'reverse',
+    remainingSeconds,
+    moistureSeconds,
+    currentTime: currentTime ? formatLocalDateTime(currentTime) : undefined,
+  }
+
+  const response = await apiClient.post<WateringResponse[]>('/calculator/watering', request)
+  return response.data
+}
+
+/**
+ * 计算所有浇水策略的结果（反向模式 - 使用成熟时间点）
+ */
+export async function calculateAllStrategiesReverseByMatureTime(
+  baseSeconds: number,
+  matureTime: Date,
+  moistureSeconds: number,
+  currentTime?: Date,
+): Promise<WateringResponse[]> {
+  const request: WateringRequest = {
+    baseSeconds,
+    mode: 'reverse',
+    matureTime: formatLocalDateTime(matureTime),
+    moistureSeconds,
+    currentTime: currentTime ? formatLocalDateTime(currentTime) : undefined,
   }
 
   const response = await apiClient.post<WateringResponse[]>('/calculator/watering', request)
