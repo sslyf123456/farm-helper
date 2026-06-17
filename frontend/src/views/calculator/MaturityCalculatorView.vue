@@ -325,13 +325,10 @@ const formLabelWidth = computed(() => {
   <div class="harvest-calc">
     <!-- 顶部表单区 -->
     <div class="page-card form-section">
-      <h1 class="page-title">收菜计算器</h1>
-      <p class="page-desc">选择作物或直接点击成熟时间卡片，查看各浇水策略下的收菜时间</p>
-
       <el-form :label-width="formLabelWidth" label-position="left">
         <!-- 计算模式切换 -->
         <el-form-item label="计算模式">
-          <el-radio-group v-model="calculationMode" size="default" class="mode-radio-group">
+          <el-radio-group v-model="calculationMode" size="small" class="mode-radio-group">
             <el-radio-button value="forward">正向计算</el-radio-button>
             <el-radio-button value="reverse">反向计算</el-radio-button>
           </el-radio-group>
@@ -339,11 +336,12 @@ const formLabelWidth = computed(() => {
         <!-- 作物选择（可选） -->
         <el-form-item label="选择作物">
           <el-select
+            size="small"
             v-model="selectedCropName"
             filterable
             clearable
             placeholder="可选，不选时下方卡片可自由切换"
-            style="width: 280px"
+            style="width: 225px"
             @visible-change="(visible: boolean) => { if (!visible) searchQuery = '' }"
             :filter-method="(query: string) => { searchQuery = query }"
           >
@@ -361,6 +359,7 @@ const formLabelWidth = computed(() => {
           <el-form-item label="种下时间">
             <el-date-picker
               v-model="plantTime"
+              size="small"
               type="datetime"
               placeholder="选择种下时间"
               format="YYYY-MM-DD HH:mm"
@@ -373,7 +372,7 @@ const formLabelWidth = computed(() => {
         <!-- 反向计算模式的表单 -->
         <template v-else>
           <el-form-item label="输入方式">
-            <el-radio-group v-model="reverseInputType" size="default" class="mode-radio-group">
+            <el-radio-group v-model="reverseInputType" size="small" class="mode-radio-group">
               <el-radio-button value="remaining">剩余成熟时间</el-radio-button>
               <el-radio-button value="matureTime">成熟时间</el-radio-button>
             </el-radio-group>
@@ -383,12 +382,14 @@ const formLabelWidth = computed(() => {
             <div style="display: flex; gap: 8px; align-items: center;">
               <el-input
                 v-model.number="remainingHours"
-                style="width: 55px"
+                size="small"
+                style="width: 40px"
               />
               <span>小时</span>
               <el-input
                 v-model.number="remainingMinutes"
-                style="width: 55px"
+                size="small"
+                style="width: 40px"
               />
               <span>分钟</span>
             </div>
@@ -397,6 +398,7 @@ const formLabelWidth = computed(() => {
           <el-form-item v-else label="成熟时间">
             <el-date-picker
               v-model="matureTime"
+              size="small"
               type="datetime"
               placeholder="选择成熟时间"
               format="YYYY-MM-DD HH:mm"
@@ -409,12 +411,14 @@ const formLabelWidth = computed(() => {
             <div style="display: flex; gap: 8px; align-items: center;">
               <el-input
                 v-model.number="moistureHours"
-                style="width: 55px"
+                size="small"
+                style="width: 40px"
               />
               <span>小时</span>
               <el-input
                 v-model.number="moistureMinutes"
-                style="width: 55px"
+                size="small"
+                style="width: 40px"
               />
               <span>分钟</span>
             </div>
@@ -423,6 +427,7 @@ const formLabelWidth = computed(() => {
           <el-form-item label="当前时间">
             <el-date-picker
               v-model="currentTime"
+              size="small"
               type="datetime"
               placeholder="选择当前时间"
               format="YYYY-MM-DD HH:mm"
@@ -434,7 +439,7 @@ const formLabelWidth = computed(() => {
 
         <!-- 计算按钮 -->
         <el-form-item>
-          <button 
+          <button
             type="button"
             class="calc-button"
             @click="handleCalculate"
@@ -614,8 +619,16 @@ const formLabelWidth = computed(() => {
 }
 
 .form-section {
-  margin-bottom: 14px;
-  padding: 16px 18px;
+  margin-bottom: 25px;
+  padding: 10px 14px;
+}
+
+.form-section :deep(.el-form-item) {
+  margin-bottom: 10px;
+}
+
+.form-section :deep(.el-form-item__label) {
+  font-size: 14px;
 }
 
 .page-title {
@@ -634,15 +647,16 @@ const formLabelWidth = computed(() => {
 
 /* 计算按钮 */
 .calc-button {
+  margin-top: 5px;
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 8px 24px;
+  padding: 6px 12px;
   background: #e67e22;
   border: none;
   border-radius: 6px;
   color: white;
-  font-size: 14px;
+  font-size: 12px;
   font-weight: 500;
   cursor: pointer;
   transition: all 0.2s ease;
