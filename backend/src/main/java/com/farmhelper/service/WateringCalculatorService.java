@@ -22,34 +22,34 @@ public class WateringCalculatorService {
      *
      * @param baseSeconds 基础成熟时间（秒）
      * @param strategy    浇水策略：none, once, diligent, extreme
-     * @return 实际成熟秒数
+     * @return 实际成熟秒数（向上取整）
      */
     public int calcMaturitySeconds(int baseSeconds, String strategy) {
-        int T = baseSeconds;
+        double T = baseSeconds;
         return switch (strategy.toLowerCase()) {
-            case "none" -> T;
-            case "once" -> (5 * T) / 6;
-            case "diligent" -> (3 * T) / 4;
-            case "extreme" -> (11 * T) / 15;
-            default -> T;
+            case "none" -> baseSeconds;
+            case "once" -> (int) Math.ceil((5.0 * T) / 6.0);
+            case "diligent" -> (int) Math.ceil((3.0 * T) / 4.0);
+            case "extreme" -> (int) Math.ceil((11.0 * T) / 15.0);
+            default -> baseSeconds;
         };
     }
 
     /**
-     * 根据策略类型，计算各浇水时刻（相对于种下时间的秒数）
+     * 根据策略类型，计算各浇水时刻（相对于种下时间的秒数，向上取整）
      *
      * @param baseSeconds 基础成熟时间（秒）
      * @param strategy    浇水策略
      * @return 浇水时刻数组（秒）
      */
     public List<Integer> getWaterTimes(int baseSeconds, String strategy) {
-        int T = baseSeconds;
-        int W = T / 3; // 满水维持时间
-        int wait = T / 15; // 极限策略最后一次等待时间
+        double T = baseSeconds;
+        int W = (int) Math.ceil(T / 3.0); // 满水维持时间（向上取整）
+        int wait = (int) Math.ceil(T / 15.0); // 极限策略最后一次等待时间（向上取整）
 
         return switch (strategy.toLowerCase()) {
             case "none" -> List.of();
-            case "once" -> List.of(0, (5 * T) / 6);
+            case "once" -> List.of(0, (int) Math.ceil((5.0 * T) / 6.0));
             case "diligent" -> List.of(0, W, 2 * W);
             case "extreme" -> List.of(0, W, 2 * W, 2 * W + wait);
             default -> List.of();
@@ -63,22 +63,22 @@ public class WateringCalculatorService {
      *
      * @param T   基础成熟时间
      * @param gap 距上次浇水的间隔时间
-     * @return 减时量（秒）
+     * @return 减时量（秒，向上取整）
      */
     public int calcWaterReduction(int T, int gap) {
-        int W = T / 3;
-        int consumed = Math.min(gap, W); // 实际消耗水分
-        return Math.round((float) consumed / 4);
+        double W = T / 3.0;
+        double consumed = Math.min(gap, W); // 实际消耗水分
+        return (int) Math.ceil(consumed / 4.0);
     }
 
     /**
-     * 浇水减时（固定值）：每次在干涸后浇水，减时 = W/4 = T/12
+     * 浇水减时（固定值）：每次在干涸后浇水，减时 = W/4 = T/12（向上取整）
      *
      * @param T 基础成熟时间
-     * @return 减时量（秒）
+     * @return 减时量（秒，向上取整）
      */
     public int calcFullReduction(int T) {
-        return Math.round((float) T / 12);
+        return (int) Math.ceil(T / 12.0);
     }
 
     /**
@@ -140,7 +140,7 @@ public class WateringCalculatorService {
             int baseSeconds, String strategy, int matureSeconds, LocalDateTime plantTime) {
 
         int T = baseSeconds;
-        int W = T / 3;
+        int W = (int) Math.ceil(T / 3.0);
         List<Integer> waterTimes = getWaterTimes(baseSeconds, strategy);
         List<WateringResponse.TimeNode> nodes = new ArrayList<>();
 
@@ -201,11 +201,20 @@ public class WateringCalculatorService {
             harvestTitle = "自然成熟";
             harvestDesc = "不浇水，等待自然成熟";
         } else if ("extreme".equals(strategy)) {
-            // 极限：最后一步是浇水即熟，合并展示
+            // 极限：最后一步是浇水即熟，合并展示（同佛系一样描述水分状态）
             int waitSec = waterTimes.get(waterTimes.size() - 1) - waterTimes.get(waterTimes.size() - 2);
+            int dryWait = Math.max(0, waitSec - W); // 蒸发完后额外等待的时间
+            int remainingMoisture = Math.max(0, W - waitSec); // 浇水时剩余水分
             int reduction = calcWaterReduction(T, waitSec);
             harvestTitle = "等" + formatDuration(waitSec) + "后浇水秒熟";
-            harvestDesc = "浇水减" + formatDuration(reduction) + "，直接成熟";
+            if (dryWait > 60) {
+                harvestDesc = "水分在" + formatDuration(W) + "后蒸发完，再等"
+                        + formatDuration(dryWait) + "，浇水减" + formatDuration(reduction) + "直接成熟";
+            } else if (remainingMoisture > 0) {
+                harvestDesc = "浇水时还有" + formatDuration(remainingMoisture) + "水分，浇水减" + formatDuration(reduction) + "直接成熟";
+            } else {
+                harvestDesc = "浇水减" + formatDuration(reduction) + "，直接成熟";
+            }
         } else if ("once".equals(strategy)) {
             // 佛系：水分先蒸发完，再等一段时间后浇水直接成熟
             int waitSec = waterTimes.get(waterTimes.size() - 1) - waterTimes.get(waterTimes.size() - 2);
@@ -283,7 +292,7 @@ public class WateringCalculatorService {
     }
 
     /**
-     * 求解浇水等待时间：满足 gap + round(min(gap, W) / 4) = target
+     * 求解浇水等待时间：满足 gap + ceil(min(gap, W) / 4) = target
      * 用于反向计算中确定最后一次浇水的时机
      *
      * @param target 目标剩余时间
@@ -292,20 +301,17 @@ public class WateringCalculatorService {
      */
     private int solveWateringGap(int target, int W) {
         // 使用迭代精确求解
-        // 需要找到 gap，使得 gap + round(min(gap, W) / 4) = target
+        // 需要找到 gap，使得 gap + ceil(min(gap, W) / 4) = target
         
-        // 如果 gap <= W，则 gap + round(gap/4) = target
-        // 即 gap * (1 + 1/4) = target，gap ≈ target * 4/5
+        // 如果 gap <= W，则 gap + ceil(gap/4) = target
+        // 如果 gap > W，则 gap + ceil(W/4) = target
         
-        // 如果 gap > W，则 gap + round(W/4) = target
-        // 即 gap = target - round(W/4)
-        
-        int wReduction = Math.round((float) W / 4);
+        int wReduction = (int) Math.ceil(W / 4.0);
         
         // 先尝试 gap > W 的情况
         if (target > W + wReduction) {
             int gap = target - wReduction;
-            int r = Math.round((float) Math.min(gap, W) / 4);
+            int r = (int) Math.ceil(Math.min(gap, W) / 4.0);
             if (gap + r == target) {
                 return gap;
             }
@@ -313,14 +319,14 @@ public class WateringCalculatorService {
         
         // 尝试 gap <= W 的情况，从大到小搜索以找到最接近的解
         for (int gap = target; gap >= 1; gap--) {
-            int r = Math.round((float) Math.min(gap, W) / 4);
+            int r = (int) Math.ceil(Math.min(gap, W) / 4.0);
             if (gap + r == target) {
                 return gap;
             }
         }
         
-        // 如果找不到精确解，返回近似值
-        return Math.round(target * 4f / 5);
+        // 如果找不到精确解，返回近似值（4/5乘以target，向上取整）
+        return (int) Math.ceil(target * 4.0 / 5.0);
     }
 
     /**
@@ -345,8 +351,8 @@ public class WateringCalculatorService {
             int moistureSeconds, LocalDateTime currentTime) {
 
         int T = baseSeconds;
-        int W = T / 3; // 满水维持时间
-        int waterThreshold = T / 30; // 浇水阈值：C >= T/30
+        int W = (int) Math.ceil(T / 3.0); // 满水维持时间
+        int waterThreshold = (int) Math.ceil(T / 30.0); // 浇水阈值：C >= T/30
 
         List<WateringResponse.TimeNode> nodes = new ArrayList<>();
         int nodeIndex = 1;
@@ -369,7 +375,7 @@ public class WateringCalculatorService {
                 // 检查是否达到浇水阈值
                 if (consumedWater >= waterThreshold) {
                     // 可以立即浇水
-                    int r1 = Math.round((float) Math.min(consumedWater, W) / 4);
+                    int r1 = (int) Math.ceil(Math.min(consumedWater, W) / 4.0);
                     int afterFirst = remainingSeconds - r1;
                     
                     // 浇水后直接成熟
@@ -393,7 +399,7 @@ public class WateringCalculatorService {
                     // 计算最后一次浇水的时间点，使得浇水后刚好成熟
                     if (afterFirst >= waterThreshold) {
                         int gap = solveWateringGap(afterFirst, W);
-                        int r2 = Math.round((float) Math.min(gap, W) / 4);
+                        int r2 = (int) Math.ceil(Math.min(gap, W) / 4.0);
                         
                         // 佛系浇水：详细描述水分状态和等待过程
                         String desc;
@@ -433,7 +439,7 @@ public class WateringCalculatorService {
                     
                     if (remainingAfterWait >= waterThreshold) {
                         // 等到可浇水时，浇一次水
-                        int r1 = Math.round((float) waterThreshold / 4);
+                        int r1 = (int) Math.ceil(waterThreshold / 4.0);
                         int afterWater = remainingAfterWait - r1;
                         
                         // 浇水后直接成熟
@@ -456,7 +462,7 @@ public class WateringCalculatorService {
                         // 计算最后一次浇水
                         if (afterWater >= waterThreshold) {
                             int gap = solveWateringGap(afterWater, W);
-                            int r2 = Math.round((float) Math.min(gap, W) / 4);
+                            int r2 = (int) Math.ceil(Math.min(gap, W) / 4.0);
                             
                             // 佛系浇水：详细描述水分状态和等待过程
                             String desc;
@@ -506,7 +512,7 @@ public class WateringCalculatorService {
                 
                 // 第一次浇水（如果可以）
                 if (consumedWater >= waterThreshold) {
-                    int r1 = Math.round((float) Math.min(consumedWater, W) / 4);
+                    int r1 = (int) Math.ceil(Math.min(consumedWater, W) / 4.0);
                     remaining -= r1;
                     
                     // 浇水后直接成熟
@@ -542,7 +548,7 @@ public class WateringCalculatorService {
                     cumulativeTime += waitToThreshold;
                     remaining -= waitToThreshold;
                     
-                    int r1 = Math.round((float) waterThreshold / 4);
+                    int r1 = (int) Math.ceil(waterThreshold / 4.0);
                     remaining -= r1;
                     
                     // 浇水后直接成熟
@@ -564,14 +570,17 @@ public class WateringCalculatorService {
                             formatTimeFull(currentTime, cumulativeTime), false));
                 }
                 
-                // 后续浇水：每次等水干涸（等W）后浇水，直到剩余时间 <= W + waterThreshold
-                while (remaining > W + waterThreshold) {
+                // 后续浇水：每次等水干涸（等W）后浇水
+                // 循环条件：remaining 扣掉本次"等干涸(W) + 浇水减时(r)"之后，
+                // 剩余时间仍 >= waterThreshold，才说明还值得继续循环（后面还有卡秒熟机会）
+                int fullReduction = calcFullReduction(T);
+                while (remaining > W + fullReduction + waterThreshold) {
                     // 等待W秒后水分干涸
                     cumulativeTime += W;
                     remaining -= W;
                     
                     // 干涸后浇水
-                    int r = calcFullReduction(T); // T/12
+                    int r = fullReduction; // T/12
                     remaining -= r;
                     
                     nodes.add(new WateringResponse.TimeNode(
@@ -586,12 +595,25 @@ public class WateringCalculatorService {
                 // 最后一次浇水：卡时间刚好浇水后秒熟（如果剩余时间 >= 浇水阈值）
                 if (remaining >= waterThreshold) {
                     int gap = solveWateringGap(remaining, W);
-                    int r = Math.round((float) Math.min(gap, W) / 4);
+                    int r = (int) Math.ceil(Math.min(gap, W) / 4.0);
                     cumulativeTime += gap;
-                    
+
+                    // 描述浇水时的水分状态
+                    String lastDesc;
+                    int dryWait = Math.max(0, gap - W);
+                    int remainingMoisture = Math.max(0, W - gap);
+                    if (dryWait > 60) {
+                        lastDesc = "水分在" + formatDuration(W) + "后蒸发完，再等"
+                                + formatDuration(dryWait) + "，浇水减" + formatDuration(r) + "直接成熟";
+                    } else if (remainingMoisture > 0) {
+                        lastDesc = "浇水时还有" + formatDuration(remainingMoisture) + "水分，浇水减" + formatDuration(r) + "直接成熟";
+                    } else {
+                        lastDesc = "浇水减" + formatDuration(r) + "，直接成熟";
+                    }
+
                     nodes.add(new WateringResponse.TimeNode(
                             nodeIndex, "等" + formatDuration(gap) + "后浇水秒熟",
-                            "浇水减" + formatDuration(r) + "，直接成熟",
+                            lastDesc,
                             cumulativeTime,
                             formatTimeFull(currentTime, cumulativeTime), true));
                 } else {

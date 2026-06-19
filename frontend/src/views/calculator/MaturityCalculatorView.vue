@@ -708,7 +708,7 @@ const formLabelWidth = computed(() => {
   font-size: 13px;
   font-weight: 700;
   color: var(--fh-green);
-  margin-bottom: 8px;
+  margin-bottom: 16px;
   line-height: 1;
   flex-wrap: wrap;
 }

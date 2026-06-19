@@ -68,11 +68,11 @@ export function calcMaturitySeconds(baseSeconds: number, strategy: WaterStrategy
     case 'none':
       return T
     case 'once':
-      return (5 * T) / 6
+      return Math.ceil((5 * T) / 6)
     case 'diligent':
-      return (3 * T) / 4
+      return Math.ceil((3 * T) / 4)
     case 'extreme':
-      return (11 * T) / 15
+      return Math.ceil((11 * T) / 15)
     default:
       return T
   }

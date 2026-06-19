@@ -21,7 +21,8 @@
    - [GET /api/static/rewards](#get-apistaticrewards)
 3. [计算器接口 `/api/calculator`](#计算器接口-apicalculator)
    - [POST /api/calculator/watering](#post-apicalculatorwatering)
-   - [POST /api/calculator/watering/single](#post-apicalculatorwatering-single)
+   - [POST /api/calculator/watering/single](#post-apicalculatorwateringsingle)
+   - [POST /api/calculator/watering/single/reverse](#post-apicalculatorwateringsingle reverse)
 4. [数据来源说明](#数据来源说明)
 5. [通用错误码](#通用错误码)
 
@@ -431,11 +432,34 @@ GET /api/static/rewards
 
 ## 计算器接口 `/api/calculator`
 
+支持正向计算（从种下时间推算成熟时间）和反向计算（从剩余成熟时间/成熟时间点反推浇水计划）。
+
+---
+
+### 通用说明
+
+所有计算器接口共用 `WateringRequest` 请求体，通过 `mode` 字段区分正向/反向计算。
+
+**请求字段（WateringRequest）**
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| baseSeconds | number | 是 | 作物基础成熟时间（秒） |
+| mode | string | 否 | 计算模式：`forward`（正向，默认）或 `reverse`（反向） |
+| plantTime | string | 否 | 种植时间（ISO-8601 格式），正向计算时用 |
+| strategy | string | 否* | 浇水策略（single 接口必填）：`none`、`once`、`diligent`、`extreme` |
+| remainingSeconds | number | 否* | 剩余成熟时间（秒），反向计算时必填（二选一） |
+| moistureSeconds | number | 否* | 当前水分维持时间（秒），反向计算时必填 |
+| matureTime | string | 否* | 成熟时间点（ISO-8601 格式），与 remainingSeconds 二选一 |
+| currentTime | string | 否 | 当前时间（ISO-8601 格式），不填则使用服务器时间 |
+
+> `remainingSeconds` 与 `matureTime` 二选一，用于反向计算。若同时提供 `matureTime`，则自动计算剩余秒数。
+
 ---
 
 ### POST /api/calculator/watering
 
-计算所有浇水策略（自然成熟、佛系浇水、勤奋浇水、极限浇水）的成熟时间及详细节点。
+计算所有浇水策略的成熟时间及详细节点。
 
 **请求**
 
@@ -444,23 +468,43 @@ POST /api/calculator/watering
 Content-Type: application/json
 ```
 
-**请求体**
+**正向计算请求体示例**
 
 ```json
 {
   "baseSeconds": 3600,
+  "mode": "forward",
   "plantTime": "2026-06-16T10:00:00"
 }
 ```
 
-**请求字段说明**
+**反向计算请求体示例（剩余时间模式）**
 
-| 字段 | 类型 | 必填 | 说明 |
-|------|------|------|------|
-| baseSeconds | number | 是 | 作物基础成熟时间（秒），如 3600 表示 1小时 |
-| plantTime | string | 否 | 种植时间（ISO-8601格式，如 "2026-06-16T10:00:00"），用于计算具体收菜时刻 |
+```json
+{
+  "baseSeconds": 3600,
+  "mode": "reverse",
+  "remainingSeconds": 600,
+  "moistureSeconds": 300,
+  "currentTime": "2026-06-16T09:00:00"
+}
+```
+
+**反向计算请求体示例（成熟时间模式）**
+
+```json
+{
+  "baseSeconds": 3600,
+  "mode": "reverse",
+  "matureTime": "2026-06-16T10:30:00",
+  "moistureSeconds": 300,
+  "currentTime": "2026-06-16T09:00:00"
+}
+```
 
 **响应示例（200 OK）**
+
+同下方示例，正向计算返回 4 种策略，反向计算返回 3 种策略（`none`、`once`、`extreme`）。
 
 ```json
 [
@@ -481,32 +525,6 @@ Content-Type: application/json
         "harvest": true
       }
     ]
-  },
-  {
-    "strategy": "once",
-    "label": "佛系浇水",
-    "description": "共浇水2次，缩短约16.7%的成熟时间",
-    "matureSeconds": 3000,
-    "formatted": "50分钟",
-    "matureAt": "2026-06-16 10:50",
-    "nodes": [
-      {
-        "index": 1,
-        "title": "种下立即浇水",
-        "desc": "浇水减5分钟，剩余55分钟，水分可以维持20分钟",
-        "offsetSeconds": 0,
-        "timeStr": null,
-        "harvest": false
-      },
-      {
-        "index": 2,
-        "title": "等50分钟后浇水秒熟",
-        "desc": "浇水减5分钟，直接成熟",
-        "offsetSeconds": 3000,
-        "timeStr": "2026-06-16 10:50",
-        "harvest": true
-      }
-    ]
   }
 ]
 ```
@@ -515,12 +533,12 @@ Content-Type: application/json
 
 | 字段 | 类型 | 说明 |
 |------|------|------|
-| strategy | string | 策略标识：none（自然成熟）、once（佛系浇水）、diligent（勤奋浇水）、extreme（极限浇水） |
+| strategy | string | 策略标识：`none`（自然成熟）、`once`（佛系浇水）、`diligent`（勤奋浇水）、`extreme`（极限浇水） |
 | label | string | 策略中文标签 |
 | description | string | 策略描述 |
 | matureSeconds | number | 实际成熟秒数 |
 | formatted | string | 格式化的成熟时间（中文可读形式） |
-| matureAt | string | 成熟时刻（格式 "yyyy-MM-dd HH:mm"，仅当请求中提供 plantTime 时返回） |
+| matureAt | string | 成熟时刻（格式 "yyyy-MM-dd HH:mm"，仅当可计算时返回） |
 | nodes | array | 浇水/收菜节点列表 |
 
 **TimeNode 字段说明**
@@ -528,17 +546,17 @@ Content-Type: application/json
 | 字段 | 类型 | 说明 |
 |------|------|------|
 | index | number | 步骤编号（从1开始） |
-| title | string | 节点标题，如 "种下立即浇水"、"等20分钟后浇水" |
+| title | string | 节点标题，如 "立即浇水"、"等X后浇水秒熟" |
 | desc | string | 节点描述，包含减时、剩余时间、水分维持时间等信息 |
-| offsetSeconds | number | 该节点距种下的秒数 |
-| timeStr | string \| null | 具体时间字符串（格式 "yyyy-MM-dd HH:mm"），种下立即浇水节点为 null |
+| offsetSeconds | number | 该节点距起点的秒数（正向：种下时间；反向：当前时间） |
+| timeStr | string \| null | 具体时间字符串（格式 "yyyy-MM-dd HH:mm"） |
 | harvest | boolean | 是否为最终收菜节点 |
 
 ---
 
 ### POST /api/calculator/watering/single
 
-计算单个浇水策略的成熟时间及详细节点。
+计算单个浇水策略的成熟时间及详细节点（正向计算）。
 
 **请求**
 
@@ -547,7 +565,7 @@ POST /api/calculator/watering/single
 Content-Type: application/json
 ```
 
-**请求体**
+**请求体示例**
 
 ```json
 {
@@ -557,68 +575,74 @@ Content-Type: application/json
 }
 ```
 
-**请求字段说明**
-
-| 字段 | 类型 | 必填 | 说明 |
-|------|------|------|------|
-| baseSeconds | number | 是 | 作物基础成熟时间（秒） |
-| strategy | string | 是 | 浇水策略：none、once、diligent、extreme |
-| plantTime | string | 否 | 种植时间（ISO-8601格式） |
-
 **响应示例（200 OK）**
+
+单策略响应，结构与 `/watering` 返回数组中的单个元素相同（见上方 TimeNode 说明）。
+
+---
+
+### POST /api/calculator/watering/single/reverse
+
+计算单个浇水策略的反向计算结果，已知剩余成熟时间和当前水分，推算指定策略的浇水计划。
+
+**请求**
+
+```
+POST /api/calculator/watering/single/reverse
+Content-Type: application/json
+```
+
+**请求体示例（剩余时间模式）**
 
 ```json
 {
-  "strategy": "diligent",
-  "label": "勤奋浇水",
-  "description": "共浇水3次，缩短25%的成熟时间",
-  "matureSeconds": 2700,
-  "formatted": "45分钟",
-  "matureAt": "2026-06-16 10:45",
-  "nodes": [
-    {
-      "index": 1,
-      "title": "种下立即浇水",
-      "desc": "浇水减5分钟，剩余55分钟，水分可以维持20分钟",
-      "offsetSeconds": 0,
-      "timeStr": null,
-      "harvest": false
-    },
-    {
-      "index": 2,
-      "title": "等20分钟后浇水",
-      "desc": "浇水减5分钟，剩余30分钟，水分可以维持20分钟",
-      "offsetSeconds": 1200,
-      "timeStr": "2026-06-16 10:20",
-      "harvest": false
-    },
-    {
-      "index": 3,
-      "title": "等20分钟后浇水",
-      "desc": "浇水减5分钟，剩余5分钟，水分可以维持20分钟",
-      "offsetSeconds": 2400,
-      "timeStr": "2026-06-16 10:40",
-      "harvest": false
-    },
-    {
-      "index": 4,
-      "title": "再等5分钟后自然成熟",
-      "desc": "不需要浇水，直接自然成熟",
-      "offsetSeconds": 2700,
-      "timeStr": "2026-06-16 10:45",
-      "harvest": true
-    }
-  ]
+  "baseSeconds": 3600,
+  "strategy": "extreme",
+  "remainingSeconds": 600,
+  "moistureSeconds": 300,
+  "currentTime": "2026-06-16T09:00:00"
 }
 ```
 
-**响应字段说明**
+**请求体示例（成熟时间模式）**
 
-同 [POST /api/calculator/watering](#post-apicalculatorwatering)。
+```json
+{
+  "baseSeconds": 3600,
+  "strategy": "once",
+  "matureTime": "2026-06-16T10:30:00",
+  "moistureSeconds": 300,
+  "currentTime": "2026-06-16T09:00:00"
+}
+```
 
-**错误响应（400 Bad Request）**
+**响应示例（200 OK）**
 
-当请求参数不合法时（如 baseSeconds ≤ 0 或缺少 strategy），返回 HTTP 400。
+单策略响应，结构与 `/watering`（反向模式）返回数组中的单个元素相同（见上方 TimeNode 说明）。反向策略仅支持 `none`、`once`、`extreme` 三种。
+
+---
+
+### 错误响应
+
+| HTTP 状态码 | 说明 |
+|------------|------|
+| 400 Bad Request | 请求参数不合法 |
+| 500 Internal Server Error | 服务内部错误 |
+
+**400 错误场景**
+
+| 场景 | 触发条件 |
+|------|----------|
+| baseSeconds 不合法 | `baseSeconds ≤ 0` |
+| strategy 缺失 | single 或 single/reverse 接口未提供 `strategy` |
+| 反向策略不合法 | single/reverse 接口 `strategy` 只支持 `none`、`once`、`extreme` |
+| 反向计算缺少参数 | `remainingSeconds` 和 `matureTime` 均未提供 |
+| 成熟时间已过 | `matureTime` 早于 `currentTime` |
+| 剩余时间超限 | `remainingSeconds > baseSeconds`（反向计算） |
+| 成熟时间差超限 | `matureTime - currentTime > baseSeconds`（反向计算） |
+| 水分维持度超限 | `moistureSeconds > baseSeconds / 3`（反向计算） |
+
+> 以上场景均返回 HTTP 400，响应体为空或 null。
 
 ---
 
@@ -647,9 +671,10 @@ Content-Type: application/json
 | HTTP 状态码 | 说明 |
 |------------|------|
 | 200 OK | 请求成功，返回 JSON 数据 |
+| 400 Bad Request | 请求参数不合法（详见各接口说明） |
 | 404 Not Found | 资源不存在（目前仅 `/crops/{name}` 会返回 404） |
 | 500 Internal Server Error | 服务启动时 CSV 文件缺失或格式错误 |
 
 ---
 
-*文档最后更新：2026-06-16*
+*文档最后更新：2026-06-19*
